@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IPTV Web Streaming - Sports</title>
+    <title>Ultimate IPTV Web Player</title>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
         body {
@@ -35,26 +35,35 @@
             margin-top: 20px;
             text-align: center;
         }
+        /* --- Sidebar & Controls --- */
         #sidebar {
             flex: 1;
             background-color: #1e1e1e;
             border-left: 1px solid #333;
             display: flex;
             flex-direction: column;
-            min-width: 250px;
+            min-width: 300px;
         }
         #sidebar-header {
-            padding: 20px;
+            padding: 20px 15px;
             background-color: #272727;
             font-size: 1.2rem;
             font-weight: bold;
-        }
-        #search-container {
-            padding: 10px 15px;
-            background-color: #272727;
             border-bottom: 1px solid #333;
         }
-        #search-input {
+        .controls-container {
+            padding: 15px;
+            background-color: #222;
+            border-bottom: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .dropdown-group {
+            display: flex;
+            gap: 10px;
+        }
+        select, input {
             width: 100%;
             padding: 10px;
             box-sizing: border-box;
@@ -64,10 +73,11 @@
             border-radius: 4px;
             font-family: inherit;
         }
-        #search-input:focus {
+        select:focus, input:focus {
             outline: none;
             border-color: #007bff;
         }
+        /* --- Channel List --- */
         #channel-list {
             list-style: none;
             padding: 0;
@@ -76,7 +86,7 @@
             flex-grow: 1;
         }
         .channel-item {
-            padding: 15px 20px;
+            padding: 12px 15px;
             border-bottom: 1px solid #2a2a2a;
             cursor: pointer;
             transition: background 0.2s;
@@ -100,9 +110,8 @@
             text-align: center;
             color: #888;
         }
-        .no-results {
-            font-style: italic;
-        }
+        .no-results { font-style: italic; }
+        .active-channel { background-color: #004080 !important; }
     </style>
 </head>
 <body>
@@ -116,41 +125,108 @@
     </div>
 
     <div id="sidebar">
-        <div id="sidebar-header">Live Channels (Sports)</div>
-        <div id="search-container">
-            <input type="text" id="search-input" placeholder="Search channels...">
+        <div id="sidebar-header">IPTV Playlist Database</div>
+        
+        <div class="controls-container">
+            <div class="dropdown-group">
+                <select id="filter-type">
+                    <option value="category">By Category</option>
+                    <option value="country">By Country</option>
+                </select>
+                <select id="filter-value">
+                    </select>
+            </div>
+            <input type="text" id="search-input" placeholder="Search in current list...">
         </div>
+
         <ul id="channel-list">
-            <div class="loading">Loading playlist...</div>
+            <div class="loading">Select a category or country to load channels...</div>
         </ul>
     </div>
 
     <script>
-        const PLAYLIST_URL = 'https://iptv-org.github.io/iptv/categories/sports.m3u';
-        
-        // YOUR CUSTOM PROXY
+        // YOUR CUSTOM CLOUDFLARE PROXY (Spoofing & CORS handled here)
         const PROXY_URL = 'https://sports-proxy.md-daf001.workers.dev/?';
-        
+        const BASE_IPTV_URL = 'https://iptv-org.github.io/iptv';
+
+        // Pre-defined lists based on iptv-org structure
+        const categories = [
+            { id: 'sports', name: 'Sports' },
+            { id: 'movies', name: 'Movies' },
+            { id: 'news', name: 'News' },
+            { id: 'entertainment', name: 'Entertainment' },
+            { id: 'documentary', name: 'Documentaries' },
+            { id: 'music', name: 'Music' },
+            { id: 'kids', name: 'Kids' },
+            { id: 'comedy', name: 'Comedy' }
+        ];
+
+        const countries = [
+            { id: 'bd', name: 'Bangladesh' },
+            { id: 'in', name: 'India' },
+            { id: 'us', name: 'United States' },
+            { id: 'uk', name: 'United Kingdom' },
+            { id: 'ca', name: 'Canada' },
+            { id: 'au', name: 'Australia' },
+            { id: 'pk', name: 'Pakistan' },
+            { id: 'ae', name: 'UAE' }
+        ];
+
         const video = document.getElementById('video');
         const channelList = document.getElementById('channel-list');
         const currentChannelName = document.getElementById('current-channel-name');
         const statusMsg = document.getElementById('status-msg');
-        const searchInput = document.getElementById('search-input'); 
+        
+        const filterType = document.getElementById('filter-type');
+        const filterValue = document.getElementById('filter-value');
+        const searchInput = document.getElementById('search-input');
+        
         let hls;
         let allChannels = []; 
 
-        async function loadPlaylist() {
+        // Initialize Dropdowns
+        function updateDropdowns() {
+            filterValue.innerHTML = '';
+            const type = filterType.value;
+            const dataList = type === 'category' ? categories : countries;
+
+            dataList.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item.id;
+                option.textContent = item.name;
+                filterValue.appendChild(option);
+            });
+
+            fetchPlaylist(); // Fetch the default selection immediately
+        }
+
+        // Fetch the specific M3U file based on selection
+        async function fetchPlaylist() {
+            channelList.innerHTML = '<div class="loading">Downloading playlist...</div>';
+            searchInput.value = ''; // Reset search
+            
+            const type = filterType.value; // 'category' or 'country'
+            const id = filterValue.value;  // 'sports', 'us', etc.
+            
+            // Construct iptv-org URL (e.g., /categories/sports.m3u or /countries/us.m3u)
+            const typeFolder = type === 'category' ? 'categories' : 'countries';
+            const playlistUrl = `${BASE_IPTV_URL}/${typeFolder}/${id}.m3u`;
+
             try {
-                const response = await fetch(PLAYLIST_URL);
+                // iptv-org text files have CORS open, no proxy needed for the .m3u
+                const response = await fetch(playlistUrl);
+                if (!response.ok) throw new Error("Playlist not found");
+                
                 const text = await response.text();
                 allChannels = parseM3U(text);
                 renderChannelList(allChannels);
             } catch (error) {
-                channelList.innerHTML = '<div class="loading">Error loading playlist.</div>';
+                channelList.innerHTML = '<div class="no-results">Error loading playlist or playlist is empty.</div>';
                 console.error('Error fetching playlist:', error);
             }
         }
 
+        // Parse M3U Data
         function parseM3U(m3uData) {
             const lines = m3uData.split('\n');
             const channels = [];
@@ -158,7 +234,6 @@
 
             for (let i = 0; i < lines.length; i++) {
                 const line = lines[i].trim();
-                
                 if (line.startsWith('#EXTINF:')) {
                     const nameMatch = line.match(/,(.+)$/);
                     if (nameMatch) currentChannel.name = nameMatch[1];
@@ -174,18 +249,18 @@
             return channels;
         }
 
+        // Render Sidebar List
         function renderChannelList(channels) {
             channelList.innerHTML = ''; 
             
             if (channels.length === 0) {
-                channelList.innerHTML = '<div class="no-results">No channels found.</div>';
+                channelList.innerHTML = '<div class="no-results">No channels available in this list.</div>';
                 return;
             }
 
             channels.forEach(channel => {
                 const li = document.createElement('li');
                 li.className = 'channel-item';
-                
                 const logoUrl = channel.logo || 'https://via.placeholder.com/40?text=TV';
                 
                 li.innerHTML = `
@@ -193,11 +268,17 @@
                     <span>${channel.name}</span>
                 `;
                 
-                li.onclick = () => playStream(channel.url, channel.name);
+                li.onclick = (e) => {
+                    // Remove active class from all, add to clicked
+                    document.querySelectorAll('.channel-item').forEach(el => el.classList.remove('active-channel'));
+                    li.classList.add('active-channel');
+                    playStream(channel.url, channel.name);
+                };
                 channelList.appendChild(li);
             });
         }
 
+        // Search Filter Event
         searchInput.addEventListener('keyup', (e) => {
             const searchTerm = e.target.value.toLowerCase();
             const filteredChannels = allChannels.filter(channel => 
@@ -206,14 +287,17 @@
             renderChannelList(filteredChannels);
         });
 
+        // Dropdown Change Events
+        filterType.addEventListener('change', updateDropdowns);
+        filterValue.addEventListener('change', fetchPlaylist);
+
+        // Play Stream securely through Proxy
         function playStream(url, name) {
             currentChannelName.innerText = `Playing: ${name}`;
-            statusMsg.innerText = "Loading stream securely...";
+            statusMsg.innerText = "Connecting to proxy...";
 
             if (Hls.isSupported()) {
-                if (hls) {
-                    hls.destroy(); 
-                }
+                if (hls) hls.destroy(); 
                 
                 hls = new Hls({
                     xhrSetup: function(xhr, requestUrl) {
@@ -225,13 +309,13 @@
                 hls.attachMedia(video);
                 
                 hls.on(Hls.Events.MANIFEST_PARSED, function() {
-                    statusMsg.innerText = "Stream loaded.";
-                    video.play().catch(e => console.log("Autoplay blocked"));
+                    statusMsg.innerText = "Stream live.";
+                    video.play().catch(e => console.log("Autoplay blocked by browser"));
                 });
 
                 hls.on(Hls.Events.ERROR, function(event, data) {
                     if (data.fatal) {
-                        statusMsg.innerText = "Error: Stream offline or geo-blocked.";
+                        statusMsg.innerText = "Error: Stream is offline, geo-blocked, or rate-limited.";
                         statusMsg.style.color = "#ff4444";
                     }
                 });
@@ -239,13 +323,14 @@
             else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                 video.src = PROXY_URL + encodeURIComponent(url);
                 video.addEventListener('loadedmetadata', function() {
-                    statusMsg.innerText = "Stream loaded.";
+                    statusMsg.innerText = "Stream live.";
                     video.play();
                 });
             }
         }
 
-        loadPlaylist();
+        // Boot App
+        updateDropdowns();
     </script>
 </body>
 </html>
