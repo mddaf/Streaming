@@ -49,7 +49,6 @@
             font-size: 1.2rem;
             font-weight: bold;
         }
-        /* --- New Search Bar Styles --- */
         #search-container {
             padding: 10px 15px;
             background-color: #272727;
@@ -69,7 +68,6 @@
             outline: none;
             border-color: #007bff;
         }
-        /* ----------------------------- */
         #channel-list {
             list-style: none;
             padding: 0;
@@ -97,16 +95,12 @@
             border-radius: 4px;
             padding: 2px;
         }
-        .loading {
+        .loading, .no-results {
             padding: 20px;
             text-align: center;
             color: #888;
         }
-        /* Highlight matched text */
         .no-results {
-            padding: 20px;
-            text-align: center;
-            color: #888;
             font-style: italic;
         }
     </style>
@@ -133,15 +127,17 @@
 
     <script>
         const PLAYLIST_URL = 'https://iptv-org.github.io/iptv/categories/sports.m3u';
-        const PROXY_URL = 'https://corsproxy.io/?';
+        
+        // YOUR CUSTOM PROXY
+        const PROXY_URL = 'https://sports-proxy.md-daf001.workers.dev/?';
         
         const video = document.getElementById('video');
         const channelList = document.getElementById('channel-list');
         const currentChannelName = document.getElementById('current-channel-name');
         const statusMsg = document.getElementById('status-msg');
-        const searchInput = document.getElementById('search-input'); // Select search bar
+        const searchInput = document.getElementById('search-input'); 
         let hls;
-        let allChannels = []; // Store channels globally for search
+        let allChannels = []; 
 
         async function loadPlaylist() {
             try {
@@ -202,22 +198,17 @@
             });
         }
 
-        // --- NEW: Search Functionality ---
         searchInput.addEventListener('keyup', (e) => {
             const searchTerm = e.target.value.toLowerCase();
-            
-            // Filter the global array based on the search term
             const filteredChannels = allChannels.filter(channel => 
                 channel.name.toLowerCase().includes(searchTerm)
             );
-            
-            // Re-render the list with only the filtered channels
             renderChannelList(filteredChannels);
         });
 
         function playStream(url, name) {
             currentChannelName.innerText = `Playing: ${name}`;
-            statusMsg.innerText = "Loading stream via proxy...";
+            statusMsg.innerText = "Loading stream securely...";
 
             if (Hls.isSupported()) {
                 if (hls) {
@@ -240,7 +231,7 @@
 
                 hls.on(Hls.Events.ERROR, function(event, data) {
                     if (data.fatal) {
-                        statusMsg.innerText = "Error: Proxy overloaded or stream offline.";
+                        statusMsg.innerText = "Error: Stream offline or geo-blocked.";
                         statusMsg.style.color = "#ff4444";
                     }
                 });
@@ -248,13 +239,12 @@
             else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                 video.src = PROXY_URL + encodeURIComponent(url);
                 video.addEventListener('loadedmetadata', function() {
-                    statusMsg.innerText = "Stream loaded via proxy.";
+                    statusMsg.innerText = "Stream loaded.";
                     video.play();
                 });
             }
         }
 
-        // Initialize the app
         loadPlaylist();
     </script>
 </body>
