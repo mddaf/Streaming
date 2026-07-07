@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IPTV Web Streaming</title>
+    <title>IPTV Web Streaming - Sports</title>
+    <!-- Import HLS.js for playing m3u8 streams -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
         body {
@@ -94,16 +95,15 @@
     </div>
 
     <div id="sidebar">
-        <div id="sidebar-header">Live Channels (News)</div>
+        <div id="sidebar-header">Live Channels (Sports)</div>
         <ul id="channel-list">
             <div class="loading">Loading playlist...</div>
         </ul>
     </div>
 
     <script>
-        // We are using the "News" category from iptv-org as an example.
-        // You can change this to any .m3u link from the github.com/iptv-org/iptv repo
-        const PLAYLIST_URL = 'https://iptv-org.github.io/iptv/categories/news.m3u';
+        // Updated to the Sports category from iptv-org
+        const PLAYLIST_URL = 'https://iptv-org.github.io/iptv/categories/sports.m3u';
         
         const video = document.getElementById('video');
         const channelList = document.getElementById('channel-list');
