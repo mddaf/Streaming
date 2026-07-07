@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IPTV Web Streaming - Sports</title>
-    <!-- Import HLS.js for playing m3u8 streams -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
         body {
@@ -42,14 +41,35 @@
             border-left: 1px solid #333;
             display: flex;
             flex-direction: column;
+            min-width: 250px;
         }
         #sidebar-header {
             padding: 20px;
             background-color: #272727;
             font-size: 1.2rem;
             font-weight: bold;
+        }
+        /* --- New Search Bar Styles --- */
+        #search-container {
+            padding: 10px 15px;
+            background-color: #272727;
             border-bottom: 1px solid #333;
         }
+        #search-input {
+            width: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+            background-color: #121212;
+            border: 1px solid #444;
+            color: #ffffff;
+            border-radius: 4px;
+            font-family: inherit;
+        }
+        #search-input:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+        /* ----------------------------- */
         #channel-list {
             list-style: none;
             padding: 0;
@@ -82,6 +102,13 @@
             text-align: center;
             color: #888;
         }
+        /* Highlight matched text */
+        .no-results {
+            padding: 20px;
+            text-align: center;
+            color: #888;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -96,35 +123,38 @@
 
     <div id="sidebar">
         <div id="sidebar-header">Live Channels (Sports)</div>
+        <div id="search-container">
+            <input type="text" id="search-input" placeholder="Search channels...">
+        </div>
         <ul id="channel-list">
             <div class="loading">Loading playlist...</div>
         </ul>
     </div>
 
     <script>
-        // Updated to the Sports category from iptv-org
         const PLAYLIST_URL = 'https://iptv-org.github.io/iptv/categories/sports.m3u';
+        const PROXY_URL = 'https://corsproxy.io/?';
         
         const video = document.getElementById('video');
         const channelList = document.getElementById('channel-list');
         const currentChannelName = document.getElementById('current-channel-name');
         const statusMsg = document.getElementById('status-msg');
+        const searchInput = document.getElementById('search-input'); // Select search bar
         let hls;
+        let allChannels = []; // Store channels globally for search
 
-        // Fetch and parse the M3U playlist
         async function loadPlaylist() {
             try {
                 const response = await fetch(PLAYLIST_URL);
                 const text = await response.text();
-                const channels = parseM3U(text);
-                renderChannelList(channels);
+                allChannels = parseM3U(text);
+                renderChannelList(allChannels);
             } catch (error) {
                 channelList.innerHTML = '<div class="loading">Error loading playlist.</div>';
                 console.error('Error fetching playlist:', error);
             }
         }
 
-        // Basic M3U Parser
         function parseM3U(m3uData) {
             const lines = m3uData.split('\n');
             const channels = [];
@@ -134,32 +164,32 @@
                 const line = lines[i].trim();
                 
                 if (line.startsWith('#EXTINF:')) {
-                    // Extract channel name (after the last comma)
                     const nameMatch = line.match(/,(.+)$/);
                     if (nameMatch) currentChannel.name = nameMatch[1];
 
-                    // Extract logo URL if available
                     const logoMatch = line.match(/tvg-logo="([^"]+)"/);
                     if (logoMatch) currentChannel.logo = logoMatch[1];
                 } else if (line.startsWith('http')) {
-                    // It's a stream URL
                     currentChannel.url = line;
                     channels.push(currentChannel);
-                    currentChannel = {}; // Reset for the next channel
+                    currentChannel = {}; 
                 }
             }
             return channels;
         }
 
-        // Render channels in the sidebar
         function renderChannelList(channels) {
-            channelList.innerHTML = ''; // Clear loading text
+            channelList.innerHTML = ''; 
             
+            if (channels.length === 0) {
+                channelList.innerHTML = '<div class="no-results">No channels found.</div>';
+                return;
+            }
+
             channels.forEach(channel => {
                 const li = document.createElement('li');
                 li.className = 'channel-item';
                 
-                // Set fallback logo if none exists
                 const logoUrl = channel.logo || 'https://via.placeholder.com/40?text=TV';
                 
                 li.innerHTML = `
@@ -172,17 +202,35 @@
             });
         }
 
-        // Play the selected stream using HLS.js
+        // --- NEW: Search Functionality ---
+        searchInput.addEventListener('keyup', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            
+            // Filter the global array based on the search term
+            const filteredChannels = allChannels.filter(channel => 
+                channel.name.toLowerCase().includes(searchTerm)
+            );
+            
+            // Re-render the list with only the filtered channels
+            renderChannelList(filteredChannels);
+        });
+
         function playStream(url, name) {
             currentChannelName.innerText = `Playing: ${name}`;
-            statusMsg.innerText = "Loading stream...";
+            statusMsg.innerText = "Loading stream via proxy...";
 
             if (Hls.isSupported()) {
                 if (hls) {
-                    hls.destroy(); // Destroy previous instance
+                    hls.destroy(); 
                 }
-                hls = new Hls();
-                hls.loadSource(url);
+                
+                hls = new Hls({
+                    xhrSetup: function(xhr, requestUrl) {
+                        xhr.open('GET', PROXY_URL + encodeURIComponent(requestUrl), true);
+                    }
+                });
+                
+                hls.loadSource(url); 
                 hls.attachMedia(video);
                 
                 hls.on(Hls.Events.MANIFEST_PARSED, function() {
@@ -192,16 +240,15 @@
 
                 hls.on(Hls.Events.ERROR, function(event, data) {
                     if (data.fatal) {
-                        statusMsg.innerText = "Error: Stream offline or blocked by CORS.";
+                        statusMsg.innerText = "Error: Proxy overloaded or stream offline.";
                         statusMsg.style.color = "#ff4444";
                     }
                 });
             } 
-            // Native support (Safari / iOS)
             else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                video.src = url;
+                video.src = PROXY_URL + encodeURIComponent(url);
                 video.addEventListener('loadedmetadata', function() {
-                    statusMsg.innerText = "Stream loaded.";
+                    statusMsg.innerText = "Stream loaded via proxy.";
                     video.play();
                 });
             }
