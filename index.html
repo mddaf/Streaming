@@ -1,752 +1,214 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>⚽ FIFA WC 2026 · Live Stream Hub</title>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;800&family=Barlow:wght@400;500;600&display=swap');
-
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --bg:       #0a0c10;
-      --surface:  #13161d;
-      --card:     #181c26;
-      --border:   #1e2230;
-      --accent:   #00c2ff;
-      --gold:     #f5c518;
-      --red:      #ff3b3b;
-      --green:    #22c55e;
-      --text:     #e8eaf0;
-      --muted:    #6b7280;
-      --sidebar-w: 270px;
-    }
-
-    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Barlow', sans-serif; overflow-x: hidden; }
-
-    /* ───── HEADER ───── */
-    header {
-      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
-      padding: 11px 20px;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      position: sticky; top: 0; z-index: 100;
-    }
-    .logo {
-      font-family: 'Barlow Condensed', sans-serif;
-      font-weight: 800; font-size: 1.25rem; letter-spacing: .07em; text-transform: uppercase;
-      color: var(--accent);
-    }
-    .logo span { color: var(--gold); }
-    .logo small { color: var(--text); font-weight: 400; font-size: .8rem; letter-spacing: .03em; margin-left: 6px; }
-
-    .header-right { display: flex; align-items: center; gap: 10px; }
-
-    .live-badge {
-      display: flex; align-items: center; gap: 6px;
-      background: var(--red); color: #fff;
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: .75rem; font-weight: 700; letter-spacing: .13em; text-transform: uppercase;
-      padding: 4px 11px; border-radius: 3px;
-    }
-    .live-badge::before { content: ''; width: 7px; height: 7px; background: #fff; border-radius: 50%; animation: blink 1.1s ease-in-out infinite; }
-    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.15} }
-
-    #clockEl { font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums; }
-
-    /* ───── TICKER ───── */
-    .ticker-wrap { background: rgba(245,197,24,.1); border-bottom: 1px solid rgba(245,197,24,.2); padding: 5px 0; overflow: hidden; white-space: nowrap; }
-    .ticker-inner { display: inline-block; animation: ticker 40s linear infinite; color: var(--gold); font-size: .74rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
-    @keyframes ticker { from { transform: translateX(100vw); } to { transform: translateX(-100%); } }
-
-    /* ───── LAYOUT ───── */
-    .layout { display: flex; height: calc(100vh - 90px); }
-
-    /* ───── SIDEBAR ───── */
-    .sidebar {
-      width: var(--sidebar-w); min-width: var(--sidebar-w);
-      background: var(--surface);
-      border-right: 1px solid var(--border);
-      overflow-y: auto; overflow-x: hidden;
-      scrollbar-width: thin; scrollbar-color: var(--border) transparent;
-    }
-    .sidebar::-webkit-scrollbar { width: 4px; }
-    .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-    .sidebar-section-title {
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: .7rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
-      color: var(--muted);
-      padding: 14px 14px 6px;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .ch-item {
-      display: flex; align-items: center; gap: 10px;
-      padding: 10px 14px;
-      cursor: pointer;
-      border-left: 3px solid transparent;
-      transition: background .15s, border-color .15s;
-      border-bottom: 1px solid rgba(30,34,48,.6);
-      user-select: none;
-    }
-    .ch-item:hover { background: rgba(0,194,255,.07); border-left-color: rgba(0,194,255,.4); }
-    .ch-item.active { background: rgba(0,194,255,.13); border-left-color: var(--accent); }
-
-    .ch-icon {
-      font-size: 1.3rem; flex-shrink: 0;
-      width: 32px; height: 32px;
-      display: flex; align-items: center; justify-content: center;
-      background: rgba(255,255,255,.05);
-      border-radius: 5px;
-    }
-    .ch-info { flex: 1; min-width: 0; }
-    .ch-name {
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: .92rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase;
-      color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .ch-item.active .ch-name { color: var(--accent); }
-    .ch-sub { font-size: .68rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .ch-live-dot {
-      width: 6px; height: 6px; border-radius: 50%; background: var(--green);
-      box-shadow: 0 0 5px var(--green); flex-shrink: 0;
-      animation: blink 2s ease-in-out infinite;
-    }
-
-    /* ───── MAIN AREA ───── */
-    .main-area { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
-
-    /* Channel info bar */
-    .ch-info-bar {
-      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
-      padding: 10px 18px;
-      background: var(--card);
-      border-bottom: 1px solid var(--border);
-    }
-    .ch-info-left { display: flex; align-items: center; gap: 10px; }
-    .ch-tag {
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: .72rem; font-weight: 700; letter-spacing: .13em; text-transform: uppercase;
-      color: var(--accent); background: rgba(0,194,255,.1); border: 1px solid rgba(0,194,255,.25);
-      padding: 2px 9px; border-radius: 3px;
-    }
-    #nowChannelName {
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 1.3rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: #fff;
-    }
-    #nowChannelDesc { font-size: .74rem; color: var(--muted); }
-
-    /* Player */
-    .player-wrap { flex: 1; position: relative; background: #000; min-height: 0; }
-
-    .ratio-box {
-      position: relative; width: 100%; height: 100%;
-      background: #000;
-    }
-    .ratio-box iframe {
-      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-      border: none; display: block;
-    }
-
-    /* Loading overlay */
-    .loading-overlay {
-      position: absolute; inset: 0;
-      background: rgba(0,0,0,.92);
-      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
-      z-index: 5; transition: opacity .35s;
-    }
-    .loading-overlay.hidden { opacity: 0; pointer-events: none; }
-    .spinner { width: 42px; height: 42px; border: 3px solid rgba(0,194,255,.2); border-top-color: var(--accent); border-radius: 50%; animation: spin .85s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .loading-overlay p { font-size: .83rem; color: var(--muted); letter-spacing: .04em; }
-    .loading-overlay .load-ch { font-family:'Barlow Condensed',sans-serif; font-size:1.1rem; font-weight:700; color:var(--accent); letter-spacing:.06em; text-transform:uppercase; }
-
-    /* Controls bar */
-    .controls-bar {
-      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
-      padding: 9px 16px;
-      background: var(--surface);
-      border-top: 1px solid var(--border);
-    }
-    .ctrl-group { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
-
-    .ctrl-btn {
-      display: inline-flex; align-items: center; gap: 5px;
-      background: rgba(255,255,255,.05);
-      border: 1px solid var(--border); color: var(--text);
-      font-family: 'Barlow', sans-serif; font-size: .78rem;
-      padding: 5px 12px; border-radius: 4px; cursor: pointer;
-      transition: background .15s, border-color .15s, color .15s;
-      white-space: nowrap; user-select: none;
-    }
-    .ctrl-btn:hover { background: rgba(0,194,255,.13); border-color: var(--accent); color: var(--accent); }
-
-    select.server-select {
-      background: rgba(255,255,255,.05);
-      border: 1px solid var(--border); color: var(--text);
-      font-family: 'Barlow', sans-serif; font-size: .78rem;
-      padding: 5px 10px; border-radius: 4px; cursor: pointer; outline: none;
-    }
-    select.server-select:hover { border-color: var(--accent); }
-    select.server-select option { background: var(--surface); }
-
-    .status-row {
-      display: flex; align-items: center; gap: 14px;
-      font-size: .72rem; color: var(--muted); flex-wrap: wrap;
-    }
-    .sdot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 5px var(--green); margin-right: 4px; animation: blink 2s ease-in-out infinite; }
-
-    /* Fullscreen overrides */
-    iframe:fullscreen, iframe:-webkit-full-screen { width:100vw!important; height:100vh!important; }
-
-    /* ───── MOBILE ───── */
-    @media (max-width: 700px) {
-      :root { --sidebar-w: 220px; }
-      .layout { flex-direction: column; height: auto; }
-      .sidebar { width: 100%; min-width: 0; height: auto; max-height: 200px; overflow-x: auto; overflow-y: hidden; display: flex; flex-direction: row; border-right: none; border-bottom: 1px solid var(--border); }
-      .sidebar-section-title { display: none; }
-      .ch-item { flex-direction: column; align-items: center; text-align: center; padding: 8px 10px; border-left: none; border-bottom: none; border-top: 3px solid transparent; min-width: 80px; }
-      .ch-item.active { border-top-color: var(--accent); border-left-color: transparent; }
-      .ch-sub { display: none; }
-      .ch-live-dot { display: none; }
-      .main-area { height: auto; }
-      .player-wrap { height: 55vw; min-height: 200px; }
-      .ctrl-btn span { display: none; }
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IPTV Web Streaming</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #player-container {
+            flex: 3;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: #000;
+            padding: 20px;
+        }
+        video {
+            width: 100%;
+            max-width: 900px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            background: #1a1a1a;
+        }
+        #channel-info {
+            margin-top: 20px;
+            text-align: center;
+        }
+        #sidebar {
+            flex: 1;
+            background-color: #1e1e1e;
+            border-left: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+        }
+        #sidebar-header {
+            padding: 20px;
+            background-color: #272727;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-bottom: 1px solid #333;
+        }
+        #channel-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+        .channel-item {
+            padding: 15px 20px;
+            border-bottom: 1px solid #2a2a2a;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .channel-item:hover {
+            background-color: #333;
+        }
+        .channel-logo {
+            width: 40px;
+            height: 40px;
+            object-fit: contain;
+            background: #fff;
+            border-radius: 4px;
+            padding: 2px;
+        }
+        .loading {
+            padding: 20px;
+            text-align: center;
+            color: #888;
+        }
+    </style>
 </head>
 <body>
 
-<!-- HEADER -->
-<header>
-  <div class="logo">Stream<span>Cast</span> <small>FIFA WC 2026</small></div>
-  <div class="header-right">
-    <span id="clockEl"></span>
-    <div class="live-badge">Live</div>
-  </div>
-</header>
-
-<!-- TICKER -->
-<div class="ticker-wrap">
-  <span class="ticker-inner">
-    🏆 FIFA WORLD CUP 2026 — June 11 to July 19 &nbsp;|&nbsp;
-    🔴 TODAY: USA vs Paraguay · Jun 12, 9PM ET &nbsp;|&nbsp;
-    ⚽ Jun 13: Brazil vs Morocco · Qatar vs Switzerland · Haiti vs Scotland &nbsp;|&nbsp;
-    🌍 48 Teams · 104 Matches · USA · Mexico · Canada &nbsp;|&nbsp;
-    🏟 Final: Jul 19 · New York/New Jersey Stadium &nbsp;|&nbsp;
-    📺 Switch channels in the sidebar → beIN HD1 · HD2 · HD3 · Premium · Fox Sports · ESPN &nbsp;|&nbsp;
-    ⌨ Shortcuts: F = Fullscreen · R = Reload &nbsp;|&nbsp;
-    🏆 FIFA WORLD CUP 2026 — June 11 to July 19 &nbsp;|&nbsp;
-  </span>
-</div>
-
-<!-- LAYOUT -->
-<div class="layout">
-
-  <!-- SIDEBAR -->
-  <aside class="sidebar" id="sidebar">
-
-    <div class="sidebar-section-title">⚽ World Cup Channels</div>
-
-    <!-- beIN Sports HD channels -->
-    <div class="ch-item active" data-ch="bein1" onclick="loadChannel('bein1')">
-      <div class="ch-icon">📺</div>
-      <div class="ch-info">
-        <div class="ch-name">beIN Sports HD 1</div>
-        <div class="ch-sub">World Cup · Arabic/EN</div>
-      </div>
-      <div class="ch-live-dot"></div>
-    </div>
-
-    <div class="ch-item" data-ch="bein2" onclick="loadChannel('bein2')">
-      <div class="ch-icon">📺</div>
-      <div class="ch-info">
-        <div class="ch-name">beIN Sports HD 2</div>
-        <div class="ch-sub">World Cup · Multi</div>
-      </div>
-      <div class="ch-live-dot"></div>
-    </div>
-
-    <div class="ch-item" data-ch="bein3" onclick="loadChannel('bein3')">
-      <div class="ch-icon">📺</div>
-      <div class="ch-info">
-        <div class="ch-name">beIN Sports HD 3</div>
-        <div class="ch-sub">Live Football</div>
-      </div>
-      <div class="ch-live-dot"></div>
-    </div>
-
-    <div class="ch-item" data-ch="bein4" onclick="loadChannel('bein4')">
-      <div class="ch-icon">📺</div>
-      <div class="ch-info">
-        <div class="ch-name">beIN Sports HD 4</div>
-        <div class="ch-sub">Live Football</div>
-      </div>
-      <div class="ch-live-dot"></div>
-    </div>
-
-    <div class="ch-item" data-ch="bein5" onclick="loadChannel('bein5')">
-      <div class="ch-icon">📺</div>
-      <div class="ch-info">
-        <div class="ch-name">beIN Sports HD 5</div>
-        <div class="ch-sub">Live Football</div>
-      </div>
-      <div class="ch-live-dot"></div>
-    </div>
-
-    <div class="sidebar-section-title">⭐ Premium / WC Channels</div>
-
-    <div class="ch-item" data-ch="beinP1" onclick="loadChannel('beinP1')">
-      <div class="ch-icon">⭐</div>
-      <div class="ch-info">
-        <div class="ch-name">beIN Premium 1</div>
-        <div class="ch-sub">Premium HD Stream</div>
-      </div>
-      <div class="ch-live-dot"></div>
-    </div>
-
-    <div class="ch-item" data-ch="beinP2" onclick="loadChannel('beinP2')">
-      <div class="ch-icon">⭐</div>
-      <div class="ch-info">
-        <div class="ch-name">beIN Premium 2</div>
-        <div class="ch-sub">Premium HD Stream</div>
-      </div>
-      <div class="ch-live-dot"></div>
-    </div>
-
-    <div class="ch-item" data-ch="beinMax" onclick="loadChannel('beinMax')">
-      <div class="ch-icon">🔥</div>
-      <div class="ch-info">
-        <div class="ch-name">beIN Max HD</div>
-        <div class="ch-sub">Max Quality</div>
-      </div>
-      <div class="ch-live-dot"></div>
-    </div>
-
-    <div class="sidebar-section-title">🇺🇸 US / English Channels</div>
-
-    <div class="ch-item" data-ch="fox" onclick="loadChannel('fox')">
-      <div class="ch-icon">🦊</div>
-      <div class="ch-info">
-        <div class="ch-name">FOX Sports</div>
-        <div class="ch-sub">English · All 104 games</div>
-      </div>
-      <div class="ch-live-dot"></div>
-    </div>
-
-    <div class="ch-item" data-ch="fs1" onclick="loadChannel('fs1')">
-      <div class="ch-icon">🦊</div>
-      <div class="ch-info">
-        <div class="ch-name">FS1 (Fox Sports 1)</div>
-        <div class="ch-sub">English · World Cup</div>
-      </div>
-      <div class="ch-live-dot"></div>
-    </div>
-
-    <div class="ch-item" data-ch="espn" onclick="loadChannel('espn')">
-      <div class="ch-icon">🎯</div>
-      <div class="ch-info">
-        <div class="ch-name">ESPN</div>
-        <div class="ch-sub">Sports · Live</div>
-      </div>
-      <div class="ch-live-dot"></div>
-    </div>
-
-    <div class="sidebar-section-title">🌍 International</div>
-
-    <div class="ch-item" data-ch="skysport" onclick="loadChannel('skysport')">
-      <div class="ch-icon">☁️</div>
-      <div class="ch-info">
-        <div class="ch-name">Sky Sports</div>
-        <div class="ch-sub">UK · Football HD</div>
-      </div>
-      <div class="ch-live-dot"></div>
-    </div>
-
-    <div class="ch-item" data-ch="tnt" onclick="loadChannel('tnt')">
-      <div class="ch-icon">💥</div>
-      <div class="ch-info">
-        <div class="ch-name">TNT Sports</div>
-        <div class="ch-sub">UK · Champions League</div>
-      </div>
-      <div class="ch-live-dot"></div>
-    </div>
-
-    <div class="ch-item" data-ch="dazn" onclick="loadChannel('dazn')">
-      <div class="ch-icon">⚡</div>
-      <div class="ch-info">
-        <div class="ch-name">DAZN Sports</div>
-        <div class="ch-sub">Global · HD</div>
-      </div>
-      <div class="ch-live-dot"></div>
-    </div>
-
-    <div class="ch-item" data-ch="telemundo" onclick="loadChannel('telemundo')">
-      <div class="ch-icon">🇲🇽</div>
-      <div class="ch-info">
-        <div class="ch-name">Telemundo</div>
-        <div class="ch-sub">Spanish · 92 WC games</div>
-      </div>
-      <div class="ch-live-dot"></div>
-    </div>
-
-  </aside>
-
-  <!-- MAIN PLAYER AREA -->
-  <div class="main-area">
-
-    <!-- Channel info bar -->
-    <div class="ch-info-bar">
-      <div class="ch-info-left">
-        <span class="ch-tag">⚽ LIVE</span>
-        <div>
-          <div id="nowChannelName">beIN Sports HD 1</div>
-          <div id="nowChannelDesc">World Cup 2026 · Arabic / English broadcast</div>
+    <div id="player-container">
+        <video id="video" controls autoplay></video>
+        <div id="channel-info">
+            <h2 id="current-channel-name">Select a channel from the list</h2>
+            <p id="status-msg" style="color: #aaa;"></p>
         </div>
-      </div>
-      <div style="font-size:.72rem;color:var(--muted);">📌 If blank → Reload or switch Server below</div>
     </div>
 
-    <!-- PLAYER -->
-    <div class="player-wrap">
-      <div class="ratio-box" id="ratioBox">
-        <div class="loading-overlay" id="loadingOverlay">
-          <div class="spinner"></div>
-          <div class="load-ch" id="loadChName">beIN Sports HD 1</div>
-          <p>Connecting to stream…</p>
-        </div>
-        <iframe
-          id="streamFrame"
-          src="https://1.kooralive360.com/albaplayer/bein-sports-hd-1/?serv=0"
-          allowfullscreen="true"
-          allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
-          scrolling="no"
-          referrerpolicy="no-referrer"
-          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation allow-pointer-lock"
-        ></iframe>
-      </div>
+    <div id="sidebar">
+        <div id="sidebar-header">Live Channels (News)</div>
+        <ul id="channel-list">
+            <div class="loading">Loading playlist...</div>
+        </ul>
     </div>
 
-    <!-- CONTROLS BAR -->
-    <div class="controls-bar">
-      <div class="ctrl-group">
+    <script>
+        // We are using the "News" category from iptv-org as an example.
+        // You can change this to any .m3u link from the github.com/iptv-org/iptv repo
+        const PLAYLIST_URL = 'https://iptv-org.github.io/iptv/categories/news.m3u';
+        
+        const video = document.getElementById('video');
+        const channelList = document.getElementById('channel-list');
+        const currentChannelName = document.getElementById('current-channel-name');
+        const statusMsg = document.getElementById('status-msg');
+        let hls;
 
-        <button class="ctrl-btn" onclick="reloadStream()">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-          <span>Reload</span>
-        </button>
+        // Fetch and parse the M3U playlist
+        async function loadPlaylist() {
+            try {
+                const response = await fetch(PLAYLIST_URL);
+                const text = await response.text();
+                const channels = parseM3U(text);
+                renderChannelList(channels);
+            } catch (error) {
+                channelList.innerHTML = '<div class="loading">Error loading playlist.</div>';
+                console.error('Error fetching playlist:', error);
+            }
+        }
 
-        <select class="server-select" id="serverSelect" onchange="switchServer(this.value)">
-          <option value="0">Server 1 (HD)</option>
-          <option value="1">Server 2</option>
-          <option value="2">Server 3</option>
-          <option value="3">Server 4</option>
-        </select>
+        // Basic M3U Parser
+        function parseM3U(m3uData) {
+            const lines = m3uData.split('\n');
+            const channels = [];
+            let currentChannel = {};
 
-      </div>
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                
+                if (line.startsWith('#EXTINF:')) {
+                    // Extract channel name (after the last comma)
+                    const nameMatch = line.match(/,(.+)$/);
+                    if (nameMatch) currentChannel.name = nameMatch[1];
 
-      <div class="ctrl-group">
-        <div class="status-row">
-          <span><span class="sdot"></span>Stream Active</span>
-          <span id="statusChName">beIN Sports HD 1</span>
-        </div>
-      </div>
+                    // Extract logo URL if available
+                    const logoMatch = line.match(/tvg-logo="([^"]+)"/);
+                    if (logoMatch) currentChannel.logo = logoMatch[1];
+                } else if (line.startsWith('http')) {
+                    // It's a stream URL
+                    currentChannel.url = line;
+                    channels.push(currentChannel);
+                    currentChannel = {}; // Reset for the next channel
+                }
+            }
+            return channels;
+        }
 
-      <div class="ctrl-group">
+        // Render channels in the sidebar
+        function renderChannelList(channels) {
+            channelList.innerHTML = ''; // Clear loading text
+            
+            channels.forEach(channel => {
+                const li = document.createElement('li');
+                li.className = 'channel-item';
+                
+                // Set fallback logo if none exists
+                const logoUrl = channel.logo || 'https://via.placeholder.com/40?text=TV';
+                
+                li.innerHTML = `
+                    <img src="${logoUrl}" class="channel-logo" alt="${channel.name}" onerror="this.src='https://via.placeholder.com/40?text=TV'">
+                    <span>${channel.name}</span>
+                `;
+                
+                li.onclick = () => playStream(channel.url, channel.name);
+                channelList.appendChild(li);
+            });
+        }
 
-        <button class="ctrl-btn" onclick="openInTab()">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-          <span>New Tab</span>
-        </button>
+        // Play the selected stream using HLS.js
+        function playStream(url, name) {
+            currentChannelName.innerText = `Playing: ${name}`;
+            statusMsg.innerText = "Loading stream...";
 
-        <button class="ctrl-btn" onclick="goFullscreen()">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
-          <span>Fullscreen [F]</span>
-        </button>
+            if (Hls.isSupported()) {
+                if (hls) {
+                    hls.destroy(); // Destroy previous instance
+                }
+                hls = new Hls();
+                hls.loadSource(url);
+                hls.attachMedia(video);
+                
+                hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                    statusMsg.innerText = "Stream loaded.";
+                    video.play().catch(e => console.log("Autoplay blocked"));
+                });
 
-      </div>
-    </div>
+                hls.on(Hls.Events.ERROR, function(event, data) {
+                    if (data.fatal) {
+                        statusMsg.innerText = "Error: Stream offline or blocked by CORS.";
+                        statusMsg.style.color = "#ff4444";
+                    }
+                });
+            } 
+            // Native support (Safari / iOS)
+            else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = url;
+                video.addEventListener('loadedmetadata', function() {
+                    statusMsg.innerText = "Stream loaded.";
+                    video.play();
+                });
+            }
+        }
 
-  </div><!-- /main-area -->
-</div><!-- /layout -->
-
-<script>
-// ──────────────────────────────────────────────────────────────
-//  CHANNEL DEFINITIONS
-//  Each channel has an array of server-URL templates.
-//  {S} is replaced by the server index chosen in the dropdown.
-// ──────────────────────────────────────────────────────────────
-const CHANNELS = {
-
-  // ── beIN Sports HD 1–5 (kooralive360 Alba player)
-  bein1: {
-    name: 'beIN Sports HD 1',
-    desc: 'World Cup 2026 · Arabic / English broadcast',
-    servers: [
-      'https://1.kooralive360.com/albaplayer/bein-sports-hd-1/?serv=0',
-      'https://1.kooralive360.com/albaplayer/bein-sports-hd-1/?serv=1',
-      'https://1.kooralive360.com/albaplayer/bein-sports-hd-1/?serv=2',
-      'https://2.kooralive360.com/albaplayer/bein-sports-hd-1/?serv=0',
-    ]
-  },
-  bein2: {
-    name: 'beIN Sports HD 2',
-    desc: 'World Cup 2026 · Multiple matches',
-    servers: [
-      'https://1.kooralive360.com/albaplayer/bein-sports-hd-2/?serv=0',
-      'https://1.kooralive360.com/albaplayer/bein-sports-hd-2/?serv=1',
-      'https://1.kooralive360.com/albaplayer/bein-sports-hd-2/?serv=2',
-      'https://2.kooralive360.com/albaplayer/bein-sports-hd-2/?serv=0',
-    ]
-  },
-  bein3: {
-    name: 'beIN Sports HD 3',
-    desc: 'Live Football · World Cup 2026',
-    servers: [
-      'https://1.kooralive360.com/albaplayer/bein-sports-hd-3/?serv=0',
-      'https://1.kooralive360.com/albaplayer/bein-sports-hd-3/?serv=1',
-      'https://1.kooralive360.com/albaplayer/bein-sports-hd-3/?serv=2',
-      'https://2.kooralive360.com/albaplayer/bein-sports-hd-3/?serv=0',
-    ]
-  },
-  bein4: {
-    name: 'beIN Sports HD 4',
-    desc: 'Live Football · World Cup 2026',
-    servers: [
-      'https://1.kooralive360.com/albaplayer/bein-sports-hd-4/?serv=0',
-      'https://1.kooralive360.com/albaplayer/bein-sports-hd-4/?serv=1',
-      'https://1.kooralive360.com/albaplayer/bein-sports-hd-4/?serv=2',
-      'https://2.kooralive360.com/albaplayer/bein-sports-hd-4/?serv=0',
-    ]
-  },
-  bein5: {
-    name: 'beIN Sports HD 5',
-    desc: 'Live Football · World Cup 2026',
-    servers: [
-      'https://1.kooralive360.com/albaplayer/bein-sports-hd-5/?serv=0',
-      'https://1.kooralive360.com/albaplayer/bein-sports-hd-5/?serv=1',
-      'https://1.kooralive360.com/albaplayer/bein-sports-hd-5/?serv=2',
-      'https://2.kooralive360.com/albaplayer/bein-sports-hd-5/?serv=0',
-    ]
-  },
-
-  // ── beIN Premium
-  beinP1: {
-    name: 'beIN Premium 1',
-    desc: 'Premium HD · World Cup 2026',
-    servers: [
-      'https://1.kooralive360.com/albaplayer/bein-sports-premium-1/?serv=0',
-      'https://1.kooralive360.com/albaplayer/bein-sports-premium-1/?serv=1',
-      'https://1.kooralive360.com/albaplayer/bein-sports-premium-1/?serv=2',
-      'https://2.kooralive360.com/albaplayer/bein-sports-premium-1/?serv=0',
-    ]
-  },
-  beinP2: {
-    name: 'beIN Premium 2',
-    desc: 'Premium HD · World Cup 2026',
-    servers: [
-      'https://1.kooralive360.com/albaplayer/bein-sports-premium-2/?serv=0',
-      'https://1.kooralive360.com/albaplayer/bein-sports-premium-2/?serv=1',
-      'https://1.kooralive360.com/albaplayer/bein-sports-premium-2/?serv=2',
-      'https://2.kooralive360.com/albaplayer/bein-sports-premium-2/?serv=0',
-    ]
-  },
-  beinMax: {
-    name: 'beIN Max HD',
-    desc: 'Maximum quality stream',
-    servers: [
-      'https://1.kooralive360.com/albaplayer/bein-max-hd/?serv=0',
-      'https://1.kooralive360.com/albaplayer/bein-max-hd/?serv=1',
-      'https://1.kooralive360.com/albaplayer/bein-max-hd/?serv=2',
-      'https://2.kooralive360.com/albaplayer/bein-max-hd/?serv=0',
-    ]
-  },
-
-  // ── US Channels
-  fox: {
-    name: 'FOX Sports',
-    desc: 'English · All 104 World Cup games',
-    servers: [
-      'https://1.kooralive360.com/albaplayer/fox-sports/?serv=0',
-      'https://1.kooralive360.com/albaplayer/fox-sports/?serv=1',
-      'https://1.kooralive360.com/albaplayer/fox-sports/?serv=2',
-      'https://1.kooralive360.com/albaplayer/fox-sports-2/?serv=0',
-    ]
-  },
-  fs1: {
-    name: 'FS1 (Fox Sports 1)',
-    desc: 'English · World Cup 2026',
-    servers: [
-      'https://1.kooralive360.com/albaplayer/fox-sports-1/?serv=0',
-      'https://1.kooralive360.com/albaplayer/fox-sports-1/?serv=1',
-      'https://1.kooralive360.com/albaplayer/fox-sports-1/?serv=2',
-      'https://2.kooralive360.com/albaplayer/fox-sports-1/?serv=0',
-    ]
-  },
-  espn: {
-    name: 'ESPN',
-    desc: 'Sports Live · English',
-    servers: [
-      'https://1.kooralive360.com/albaplayer/espn/?serv=0',
-      'https://1.kooralive360.com/albaplayer/espn/?serv=1',
-      'https://1.kooralive360.com/albaplayer/espn/?serv=2',
-      'https://1.kooralive360.com/albaplayer/espn-2/?serv=0',
-    ]
-  },
-
-  // ── International
-  skysport: {
-    name: 'Sky Sports',
-    desc: 'UK · Football HD',
-    servers: [
-      'https://1.kooralive360.com/albaplayer/sky-sports-football/?serv=0',
-      'https://1.kooralive360.com/albaplayer/sky-sports-football/?serv=1',
-      'https://1.kooralive360.com/albaplayer/sky-sports-football/?serv=2',
-      'https://2.kooralive360.com/albaplayer/sky-sports-football/?serv=0',
-    ]
-  },
-  tnt: {
-    name: 'TNT Sports',
-    desc: 'UK · Champions League',
-    servers: [
-      'https://1.kooralive360.com/albaplayer/tnt-sports-1/?serv=0',
-      'https://1.kooralive360.com/albaplayer/tnt-sports-1/?serv=1',
-      'https://1.kooralive360.com/albaplayer/tnt-sports-1/?serv=2',
-      'https://2.kooralive360.com/albaplayer/tnt-sports-1/?serv=0',
-    ]
-  },
-  dazn: {
-    name: 'DAZN Sports',
-    desc: 'Global HD · Live Sports',
-    servers: [
-      'https://1.kooralive360.com/albaplayer/dazn-1/?serv=0',
-      'https://1.kooralive360.com/albaplayer/dazn-1/?serv=1',
-      'https://1.kooralive360.com/albaplayer/dazn-1/?serv=2',
-      'https://2.kooralive360.com/albaplayer/dazn-1/?serv=0',
-    ]
-  },
-  telemundo: {
-    name: 'Telemundo',
-    desc: 'Spanish · 92 World Cup games',
-    servers: [
-      'https://1.kooralive360.com/albaplayer/telemundo/?serv=0',
-      'https://1.kooralive360.com/albaplayer/telemundo/?serv=1',
-      'https://1.kooralive360.com/albaplayer/telemundo/?serv=2',
-      'https://2.kooralive360.com/albaplayer/telemundo/?serv=0',
-    ]
-  },
-};
-
-// ──────────────────────────────────────────────────────────────
-const frame   = document.getElementById('streamFrame');
-const overlay = document.getElementById('loadingOverlay');
-let   currentChKey  = 'bein1';
-let   currentServer = 0;
-
-// Hide loader on iframe load
-frame.addEventListener('load', () => setTimeout(() => overlay.classList.add('hidden'), 900));
-setTimeout(() => overlay.classList.add('hidden'), 7000);
-
-function showLoader(name) {
-  overlay.classList.remove('hidden');
-  document.getElementById('loadChName').textContent = name;
-}
-
-function loadChannel(key) {
-  const ch = CHANNELS[key];
-  if (!ch) return;
-
-  currentChKey  = key;
-  currentServer = 0;
-
-  // Update server dropdown to index 0
-  document.getElementById('serverSelect').value = '0';
-
-  // Update sidebar active state
-  document.querySelectorAll('.ch-item').forEach(el => el.classList.remove('active'));
-  const el = document.querySelector(`[data-ch="${key}"]`);
-  if (el) { el.classList.add('active'); el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
-
-  // Update header info
-  document.getElementById('nowChannelName').textContent = ch.name;
-  document.getElementById('nowChannelDesc').textContent = ch.desc;
-  document.getElementById('statusChName').textContent   = ch.name;
-
-  showLoader(ch.name);
-  frame.src = 'about:blank';
-  setTimeout(() => {
-    frame.src = ch.servers[0];
-    setTimeout(() => overlay.classList.add('hidden'), 7000);
-  }, 250);
-}
-
-function switchServer(val) {
-  const ch  = CHANNELS[currentChKey];
-  if (!ch) return;
-  const idx = parseInt(val);
-  const src = ch.servers[idx] || ch.servers[0];
-  currentServer = idx;
-  showLoader(ch.name);
-  frame.src = 'about:blank';
-  setTimeout(() => {
-    frame.src = src;
-    setTimeout(() => overlay.classList.add('hidden'), 7000);
-  }, 250);
-}
-
-function reloadStream() {
-  const ch  = CHANNELS[currentChKey];
-  if (!ch) return;
-  const src = ch.servers[currentServer] || ch.servers[0];
-  showLoader(ch.name);
-  frame.src = 'about:blank';
-  setTimeout(() => {
-    frame.src = src;
-    setTimeout(() => overlay.classList.add('hidden'), 7000);
-  }, 300);
-}
-
-function openInTab() {
-  window.open(frame.src === 'about:blank'
-    ? CHANNELS[currentChKey].servers[currentServer]
-    : frame.src, '_blank');
-}
-
-function goFullscreen() {
-  const el = frame;
-  if      (el.requestFullscreen)            el.requestFullscreen();
-  else if (el.webkitRequestFullscreen)      el.webkitRequestFullscreen();
-  else if (el.mozRequestFullScreen)         el.mozRequestFullScreen();
-  else if (el.msRequestFullscreen)          el.msRequestFullscreen();
-}
-
-// Keyboard shortcuts
-document.addEventListener('keydown', e => {
-  const tag = document.activeElement?.tagName;
-  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
-  if (e.key === 'f' || e.key === 'F') goFullscreen();
-  if (e.key === 'r' || e.key === 'R') reloadStream();
-  if (e.key === 'ArrowDown') {
-    const keys = Object.keys(CHANNELS);
-    const idx  = keys.indexOf(currentChKey);
-    if (idx < keys.length - 1) loadChannel(keys[idx + 1]);
-  }
-  if (e.key === 'ArrowUp') {
-    const keys = Object.keys(CHANNELS);
-    const idx  = keys.indexOf(currentChKey);
-    if (idx > 0) loadChannel(keys[idx - 1]);
-  }
-});
-
-// Live clock
-function tick() {
-  const n = new Date();
-  document.getElementById('clockEl').textContent =
-    n.toUTCString().slice(17, 25) + ' UTC';
-}
-tick(); setInterval(tick, 1000);
-</script>
+        // Initialize the app
+        loadPlaylist();
+    </script>
 </body>
 </html>
