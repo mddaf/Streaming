@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ultimate IPTV Web Player</title>
+    <title>Ultimate IPTV Web Player (Smart Routing)</title>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
         body {
@@ -23,6 +23,7 @@
             align-items: center;
             background-color: #000;
             padding: 20px;
+            position: relative;
         }
         video {
             width: 100%;
@@ -112,15 +113,86 @@
         }
         .no-results { font-style: italic; }
         .active-channel { background-color: #004080 !important; }
+
+        /* --- Smart Instruction Modal --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        .modal-overlay.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .modal-box {
+            background: #222;
+            border: 1px solid #444;
+            padding: 30px;
+            border-radius: 8px;
+            max-width: 450px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+        .modal-box h3 {
+            margin-top: 0;
+            color: #ffc107;
+        }
+        .modal-box p {
+            color: #ccc;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+        .modal-btn {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 15px;
+            transition: background 0.2s;
+        }
+        .modal-btn:hover {
+            background-color: #0056b3;
+        }
+        .modal-link {
+            color: #007bff;
+            text-decoration: none;
+        }
+        .modal-link:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
+
+    <div id="cors-modal" class="modal-overlay">
+        <div class="modal-box">
+            <h3>Local Stream Blocked</h3>
+            <p>Both direct and proxy routing failed. This local channel is strictly geo-blocked and requires domestic IP verification.</p>
+            <p><strong>To watch this channel:</strong> Install the <strong>Allow CORS</strong> extension, turn it <strong>ON</strong>, and click the channel again.</p>
+            <p style="font-size: 0.85rem;"><a href="https://chromewebstore.google.com/detail/allow-cors-access-control/lhobafahddgcelffkeicfaepmmpebcah" target="_blank" class="modal-link">Get the extension for Chrome here.</a></p>
+            <button class="modal-btn" onclick="closeModal()">Close & Try Again</button>
+        </div>
+    </div>
 
     <div id="player-container">
         <video id="video" controls autoplay></video>
         <div id="channel-info">
             <h2 id="current-channel-name">Select a channel from the list</h2>
-            <p id="status-msg" style="color: #aaa;"></p>
+            <p id="status-msg" style="color: #aaa;">Smart Routing Enabled: Auto-selecting optimal connection.</p>
         </div>
     </div>
 
@@ -145,11 +217,9 @@
     </div>
 
     <script>
-        // YOUR CUSTOM CLOUDFLARE PROXY (Spoofing & CORS handled here)
-        const PROXY_URL = 'https://sports-proxy.md-daf001.workers.dev/?';
         const BASE_IPTV_URL = 'https://iptv-org.github.io/iptv';
+        const PROXY_URL = 'https://sports-proxy.md-daf001.workers.dev/?'; // Your Custom Proxy
 
-        // Pre-defined lists based on iptv-org structure
         const categories = [
             { id: 'sports', name: 'Sports' },
             { id: 'movies', name: 'Movies' },
@@ -176,6 +246,7 @@
         const channelList = document.getElementById('channel-list');
         const currentChannelName = document.getElementById('current-channel-name');
         const statusMsg = document.getElementById('status-msg');
+        const corsModal = document.getElementById('cors-modal');
         
         const filterType = document.getElementById('filter-type');
         const filterValue = document.getElementById('filter-value');
@@ -184,7 +255,6 @@
         let hls;
         let allChannels = []; 
 
-        // Initialize Dropdowns
         function updateDropdowns() {
             filterValue.innerHTML = '';
             const type = filterType.value;
@@ -196,37 +266,26 @@
                 option.textContent = item.name;
                 filterValue.appendChild(option);
             });
-
-            fetchPlaylist(); // Fetch the default selection immediately
+            fetchPlaylist();
         }
 
-        // Fetch the specific M3U file based on selection
         async function fetchPlaylist() {
             channelList.innerHTML = '<div class="loading">Downloading playlist...</div>';
-            searchInput.value = ''; // Reset search
-            
-            const type = filterType.value; // 'category' or 'country'
-            const id = filterValue.value;  // 'sports', 'us', etc.
-            
-            // Construct iptv-org URL (e.g., /categories/sports.m3u or /countries/us.m3u)
-            const typeFolder = type === 'category' ? 'categories' : 'countries';
-            const playlistUrl = `${BASE_IPTV_URL}/${typeFolder}/${id}.m3u`;
+            searchInput.value = '';
+            const typeFolder = filterType.value === 'category' ? 'categories' : 'countries';
+            const playlistUrl = `${BASE_IPTV_URL}/${typeFolder}/${filterValue.value}.m3u`;
 
             try {
-                // iptv-org text files have CORS open, no proxy needed for the .m3u
                 const response = await fetch(playlistUrl);
                 if (!response.ok) throw new Error("Playlist not found");
-                
                 const text = await response.text();
                 allChannels = parseM3U(text);
                 renderChannelList(allChannels);
             } catch (error) {
                 channelList.innerHTML = '<div class="no-results">Error loading playlist or playlist is empty.</div>';
-                console.error('Error fetching playlist:', error);
             }
         }
 
-        // Parse M3U Data
         function parseM3U(m3uData) {
             const lines = m3uData.split('\n');
             const channels = [];
@@ -237,7 +296,6 @@
                 if (line.startsWith('#EXTINF:')) {
                     const nameMatch = line.match(/,(.+)$/);
                     if (nameMatch) currentChannel.name = nameMatch[1];
-
                     const logoMatch = line.match(/tvg-logo="([^"]+)"/);
                     if (logoMatch) currentChannel.logo = logoMatch[1];
                 } else if (line.startsWith('http')) {
@@ -249,10 +307,8 @@
             return channels;
         }
 
-        // Render Sidebar List
         function renderChannelList(channels) {
             channelList.innerHTML = ''; 
-            
             if (channels.length === 0) {
                 channelList.innerHTML = '<div class="no-results">No channels available in this list.</div>';
                 return;
@@ -262,74 +318,103 @@
                 const li = document.createElement('li');
                 li.className = 'channel-item';
                 const logoUrl = channel.logo || 'https://via.placeholder.com/40?text=TV';
-                
                 li.innerHTML = `
                     <img src="${logoUrl}" class="channel-logo" alt="${channel.name}" onerror="this.src='https://via.placeholder.com/40?text=TV'">
                     <span>${channel.name}</span>
                 `;
-                
                 li.onclick = (e) => {
-                    // Remove active class from all, add to clicked
                     document.querySelectorAll('.channel-item').forEach(el => el.classList.remove('active-channel'));
                     li.classList.add('active-channel');
-                    playStream(channel.url, channel.name);
+                    // Reset to false so it always tries direct connection first
+                    playStream(channel.url, channel.name, false); 
                 };
                 channelList.appendChild(li);
             });
         }
 
-        // Search Filter Event
         searchInput.addEventListener('keyup', (e) => {
             const searchTerm = e.target.value.toLowerCase();
-            const filteredChannels = allChannels.filter(channel => 
-                channel.name.toLowerCase().includes(searchTerm)
-            );
-            renderChannelList(filteredChannels);
+            renderChannelList(allChannels.filter(channel => channel.name.toLowerCase().includes(searchTerm)));
         });
 
-        // Dropdown Change Events
         filterType.addEventListener('change', updateDropdowns);
         filterValue.addEventListener('change', fetchPlaylist);
 
-        // Play Stream securely through Proxy
-        function playStream(url, name) {
+        function showCorsModal() { corsModal.classList.add('show'); }
+        function closeModal() { corsModal.classList.remove('show'); }
+
+        // --- SMART ROUTING ENGINE ---
+        // useProxy defaults to false. It will recall itself as true if direct fails.
+        function playStream(url, name, useProxy = false) {
             currentChannelName.innerText = `Playing: ${name}`;
-            statusMsg.innerText = "Connecting to proxy...";
+            
+            // Update UI status based on current routing attempt
+            if (useProxy) {
+                statusMsg.innerText = "Direct connection blocked. Routing through Proxy...";
+                statusMsg.style.color = "#ffaa00";
+            } else {
+                statusMsg.innerText = "Attempting direct connection...";
+                statusMsg.style.color = "#aaa";
+            }
 
             if (Hls.isSupported()) {
                 if (hls) hls.destroy(); 
                 
-                hls = new Hls({
+                // Configure HLS based on routing mode
+                const config = useProxy ? {
                     xhrSetup: function(xhr, requestUrl) {
                         xhr.open('GET', PROXY_URL + encodeURIComponent(requestUrl), true);
                     }
-                });
+                } : {};
                 
+                hls = new Hls(config);
                 hls.loadSource(url); 
                 hls.attachMedia(video);
                 
                 hls.on(Hls.Events.MANIFEST_PARSED, function() {
-                    statusMsg.innerText = "Stream live.";
-                    video.play().catch(e => console.log("Autoplay blocked by browser"));
+                    statusMsg.innerText = useProxy ? "Stream live (via Cloudflare Proxy)." : "Stream live (Direct Connection).";
+                    statusMsg.style.color = "#4CAF50";
+                    video.play().catch(e => console.log("Autoplay blocked"));
                 });
 
                 hls.on(Hls.Events.ERROR, function(event, data) {
                     if (data.fatal) {
-                        statusMsg.innerText = "Error: Stream is offline, geo-blocked, or rate-limited.";
-                        statusMsg.style.color = "#ff4444";
+                        if (!useProxy) {
+                            // ATTEMPT 1 FAILED: The direct connection crashed (likely CORS). 
+                            // Instantly re-run the function using the Proxy.
+                            console.warn("Direct fetch failed. Initiating Proxy Fallback.");
+                            playStream(url, name, true); 
+                        } else {
+                            // ATTEMPT 2 FAILED: The proxy also crashed (Geo-blocked or Dead Link).
+                            // Trigger the instruction modal.
+                            statusMsg.innerText = "Error: Stream blocked or offline.";
+                            statusMsg.style.color = "#ff4444";
+                            showCorsModal(); 
+                        }
                     }
                 });
             } 
+            // Fallback for Native Safari/iOS
             else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                video.src = PROXY_URL + encodeURIComponent(url);
+                const targetUrl = useProxy ? PROXY_URL + encodeURIComponent(url) : url;
+                video.src = targetUrl;
+                
                 video.addEventListener('loadedmetadata', function() {
-                    statusMsg.innerText = "Stream live.";
+                    statusMsg.innerText = useProxy ? "Stream live (via Cloudflare Proxy)." : "Stream live (Direct Connection).";
+                    statusMsg.style.color = "#4CAF50";
                     video.play();
+                });
+                
+                video.addEventListener('error', function() {
+                    if (!useProxy) {
+                        playStream(url, name, true);
+                    } else {
+                        showCorsModal();
+                    }
                 });
             }
         }
 
-        // Boot App
         updateDropdowns();
     </script>
 </body>
