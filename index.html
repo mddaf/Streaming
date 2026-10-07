@@ -3,419 +3,390 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ultimate IPTV Web Player (Smart Routing)</title>
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    <style>
-        body {
-            margin: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #121212;
-            color: #ffffff;
-            display: flex;
-            height: 100vh;
-            overflow: hidden;
-        }
-        #player-container {
-            flex: 3;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            background-color: #000;
-            padding: 20px;
-            position: relative;
-        }
-        video {
-            width: 100%;
-            max-width: 900px;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            background: #1a1a1a;
-        }
-        #channel-info {
-            margin-top: 20px;
-            text-align: center;
-        }
-        /* --- Sidebar & Controls --- */
-        #sidebar {
-            flex: 1;
-            background-color: #1e1e1e;
-            border-left: 1px solid #333;
-            display: flex;
-            flex-direction: column;
-            min-width: 300px;
-        }
-        #sidebar-header {
-            padding: 20px 15px;
-            background-color: #272727;
-            font-size: 1.2rem;
-            font-weight: bold;
-            border-bottom: 1px solid #333;
-        }
-        .controls-container {
-            padding: 15px;
-            background-color: #222;
-            border-bottom: 1px solid #333;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .dropdown-group {
-            display: flex;
-            gap: 10px;
-        }
-        select, input {
-            width: 100%;
-            padding: 10px;
-            box-sizing: border-box;
-            background-color: #121212;
-            border: 1px solid #444;
-            color: #ffffff;
-            border-radius: 4px;
-            font-family: inherit;
-        }
-        select:focus, input:focus {
-            outline: none;
-            border-color: #007bff;
-        }
-        /* --- Channel List --- */
-        #channel-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-            overflow-y: auto;
-            flex-grow: 1;
-        }
-        .channel-item {
-            padding: 12px 15px;
-            border-bottom: 1px solid #2a2a2a;
-            cursor: pointer;
-            transition: background 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-        .channel-item:hover {
-            background-color: #333;
-        }
-        .channel-logo {
-            width: 40px;
-            height: 40px;
-            object-fit: contain;
-            background: #fff;
-            border-radius: 4px;
-            padding: 2px;
-        }
-        .loading, .no-results {
-            padding: 20px;
-            text-align: center;
-            color: #888;
-        }
-        .no-results { font-style: italic; }
-        .active-channel { background-color: #004080 !important; }
+    <title>StreamPulse - Ultra Modern IPTV & Multi-Source Live Streaming Player</title>
+    <meta name="description" content="Next-generation IPTV and live streaming web player with Multi-Source playlist aggregation, Geo-bypass smart routing, CORS proxy fallback, and real-time channel availability health checks.">
+    
+    <!-- Google Fonts & Stylesheet -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/app.css">
 
-        /* --- Smart Instruction Modal --- */
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.85);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 9999;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.3s ease;
-        }
-        .modal-overlay.show {
-            opacity: 1;
-            pointer-events: auto;
-        }
-        .modal-box {
-            background: #222;
-            border: 1px solid #444;
-            padding: 30px;
-            border-radius: 8px;
-            max-width: 450px;
-            width: 90%;
-            text-align: center;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-        }
-        .modal-box h3 {
-            margin-top: 0;
-            color: #ffc107;
-        }
-        .modal-box p {
-            color: #ccc;
-            font-size: 0.95rem;
-            line-height: 1.5;
-        }
-        .modal-btn {
-            background-color: #007bff;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-            margin-top: 15px;
-            transition: background 0.2s;
-        }
-        .modal-btn:hover {
-            background-color: #0056b3;
-        }
-        .modal-link {
-            color: #007bff;
-            text-decoration: none;
-        }
-        .modal-link:hover {
-            text-decoration: underline;
-        }
-    </style>
+    <!-- Hls.js Media Engine -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 </head>
 <body>
 
-    <div id="cors-modal" class="modal-overlay">
-        <div class="modal-box">
-            <h3>Local Stream Blocked</h3>
-            <p>Both direct and proxy routing failed. This local channel is strictly geo-blocked and requires domestic IP verification.</p>
-            <p><strong>To watch this channel:</strong> Install the <strong>Allow CORS</strong> extension, turn it <strong>ON</strong>, and click the channel again.</p>
-            <p style="font-size: 0.85rem;"><a href="https://chromewebstore.google.com/detail/allow-cors-access-control/lhobafahddgcelffkeicfaepmmpebcah" target="_blank" class="modal-link">Get the extension for Chrome here.</a></p>
-            <button class="modal-btn" onclick="closeModal()">Close & Try Again</button>
-        </div>
-    </div>
+    <div id="app-container">
+        <!-- Top Navbar -->
+        <header class="navbar">
+            <a href="#" class="nav-brand" id="brand-link">
+                <div class="brand-icon-wrapper">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                </div>
+                <div>
+                    <span class="brand-text">StreamPulse</span>
+                    <span class="brand-tag">PRO</span>
+                </div>
+            </a>
 
-    <div id="player-container">
-        <video id="video" controls autoplay></video>
-        <div id="channel-info">
-            <h2 id="current-channel-name">Select a channel from the list</h2>
-            <p id="status-msg" style="color: #aaa;">Smart Routing Enabled: Auto-selecting optimal connection.</p>
-        </div>
-    </div>
-
-    <div id="sidebar">
-        <div id="sidebar-header">IPTV Playlist Database</div>
-        
-        <div class="controls-container">
-            <div class="dropdown-group">
-                <select id="filter-type">
-                    <option value="category">By Category</option>
-                    <option value="country">By Country</option>
-                </select>
-                <select id="filter-value">
-                    </select>
+            <!-- Global Quick Search -->
+            <div class="search-wrapper">
+                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="search-input" class="search-input" placeholder="Search channels, sports, news, movies..." autocomplete="off" spellcheck="false">
+                <button type="button" id="search-clear-btn" class="search-clear-btn" title="Clear search">&times;</button>
+                <span class="search-shortcut">/</span>
             </div>
-            <input type="text" id="search-input" placeholder="Search in current list...">
+
+            <!-- Navigation Tabs & Source Manager -->
+            <nav class="nav-tabs">
+                <button type="button" class="nav-tab-btn active" data-tab="channels" id="tab-channels">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>
+                    <span>Channels</span>
+                </button>
+                <button type="button" class="nav-tab-btn" data-tab="sports" id="tab-sports">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path></svg>
+                    <span>Sports Arena</span>
+                </button>
+                <button type="button" class="nav-tab-btn" data-tab="favorites" id="tab-favorites">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                    <span>Favorites</span>
+                    <span class="nav-badge" id="fav-count-badge">0</span>
+                </button>
+                <button type="button" class="nav-tab-btn" data-tab="recents" id="tab-recents">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    <span>Recent</span>
+                </button>
+                <button type="button" class="nav-tab-btn" id="open-sources-btn" title="Manage & Combine Playlist URLs">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                    <span>Sources</span>
+                </button>
+                <button type="button" class="nav-tab-btn" data-tab="custom" id="tab-custom">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    <span>Play URL</span>
+                </button>
+                <button type="button" class="nav-tab-btn" id="open-geo-guide-btn" title="Geo-Bypass & Worker Guide" style="color:var(--accent-amber);">
+                    <span>🌍 Geo-Tips</span>
+                </button>
+            </nav>
+        </header>
+
+        <!-- Subheader Toolbar (Category chips, hide offline toggle, stats) -->
+        <div class="toolbar-bar">
+            <div class="chips-container" id="chips-container">
+                <!-- Dynamically populated chips -->
+            </div>
+
+            <div class="toolbar-controls">
+                <!-- Hide Offline Toggle -->
+                <label class="toggle-wrapper" title="Only display streams verified as currently online">
+                    <input type="checkbox" id="hide-offline-toggle" class="toggle-input" checked>
+                    <div class="toggle-switch"></div>
+                    <span>Hide Offline</span>
+                </label>
+
+                <!-- Status Stats Badge -->
+                <div class="status-stats-badge" id="stats-badge">
+                    Checking channels...
+                </div>
+
+                <!-- View Mode Toggle -->
+                <div class="view-mode-group">
+                    <button type="button" class="view-btn active" id="view-grid-btn" title="Grid View">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                    </button>
+                    <button type="button" class="view-btn" id="view-list-btn" title="List View">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                    </button>
+                </div>
+            </div>
         </div>
 
-        <ul id="channel-list">
-            <div class="loading">Select a category or country to load channels...</div>
-        </ul>
+        <!-- Main Workspace Stage -->
+        <main class="main-stage">
+            <!-- Left / Player Pane -->
+            <section class="player-pane" id="player-pane">
+                <div class="video-container">
+                    <video id="main-video" controls playsinline autoplay></video>
+                    <iframe id="sports-iframe" allowfullscreen scrolling="no" allow="autoplay; fullscreen; encrypted-media"></iframe>
+
+                    <!-- Floating Server Switcher in the Video Player Screen (Image Area) -->
+                    <div class="player-screen-servers" id="player-screen-servers" style="display:none;">
+                        <span class="player-screen-servers-label">⚡ Servers:</span>
+                        <div id="player-screen-server-buttons" style="display:flex;gap:4px;"></div>
+                    </div>
+
+                    <!-- Top Overlay Badges -->
+                    <div class="player-top-overlay">
+                        <div class="stream-status-pill" id="current-channel-status">
+                            <span class="live-pulse-dot"></span> Ready to play
+                        </div>
+                        <button type="button" class="routing-mode-pill" id="routing-badge" title="Click to view routing & proxy options">
+                            ⚡ Smart Auto Route
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Player Action Toolbar -->
+                <div class="player-action-bar">
+                    <div class="action-btn-group">
+                        <button type="button" class="action-btn" id="reload-btn" title="Reload stream (R)">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                            <span>Reload</span>
+                        </button>
+                        <button type="button" class="action-btn" id="fav-active-btn" title="Bookmark Channel">
+                            ☆ Favorite
+                        </button>
+                        <!-- Server / Alternate Mirror selector buttons -->
+                        <div id="player-action-server-group" style="display:none;align-items:center;gap:4px;"></div>
+                        <select id="server-select" class="action-select" style="display:none;" title="Select Alternate Server Mirror"></select>
+                        <!-- Quality selector for HLS streams -->
+                        <select id="quality-select" class="action-select" title="Resolution Quality">
+                            <option value="-1">Auto (Adapt)</option>
+                        </select>
+                    </div>
+
+                    <div class="action-btn-group">
+                        <button type="button" class="action-btn" id="diag-toggle-btn" title="Stream Tech Diagnostics">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                            <span>Stats</span>
+                        </button>
+                        <button type="button" class="action-btn" id="pip-btn" title="Picture in Picture">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"></rect><rect x="12" y="10" width="8" height="8" rx="1"></rect></svg>
+                            <span>PiP</span>
+                        </button>
+                        <button type="button" class="action-btn" id="theater-btn" title="Theater Mode (T)">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"></rect><line x1="2" y1="12" x2="22" y2="12"></line></svg>
+                            <span>Theater</span>
+                        </button>
+                        <button type="button" class="action-btn" id="fullscreen-btn" title="Fullscreen (F)">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+                            <span>Full</span>
+                        </button>
+                        <button type="button" class="action-btn" id="popout-btn" title="Pop-out in new window">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Geo-Restriction Alert Banner -->
+                <div class="geo-alert-banner" id="geo-alert-banner"></div>
+
+                <!-- Channel Meta & Diagnostics Section -->
+                <div class="channel-meta-section">
+                    <div class="meta-header-row">
+                        <div class="channel-brand-info">
+                            <img id="active-channel-logo" class="active-channel-logo" alt="Logo" style="display:none;">
+                            <div class="channel-title-group">
+                                <h1 id="current-channel-name">Select a Channel to Watch</h1>
+                                <div class="channel-tag-badges">
+                                    <span class="badge-pill badge-category" id="current-channel-category">Live Broadcast</span>
+                                    <span class="badge-pill badge-country" id="current-stream-url-badge">IPTV Stream</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Equalizer Animation for active audio -->
+                        <div class="equalizer-wave" title="Audio Stream">
+                            <div class="eq-bar"></div>
+                            <div class="eq-bar"></div>
+                            <div class="eq-bar"></div>
+                            <div class="eq-bar"></div>
+                        </div>
+                    </div>
+
+                    <!-- Tech Specs Diagnostics Drawer -->
+                    <div class="diagnostics-panel" id="diag-panel">
+                        <div class="diag-grid">
+                            <div class="diag-item">
+                                <span class="diag-label">Resolution</span>
+                                <span class="diag-val" id="diag-res">1080p (Auto)</span>
+                            </div>
+                            <div class="diag-item">
+                                <span class="diag-label">Bitrate</span>
+                                <span class="diag-val" id="diag-bitrate">Adapting</span>
+                            </div>
+                            <div class="diag-item">
+                                <span class="diag-label">Buffer Length</span>
+                                <span class="diag-val" id="diag-buffer">0.0s</span>
+                            </div>
+                            <div class="diag-item">
+                                <span class="diag-label">Dropped Frames</span>
+                                <span class="diag-val" id="diag-dropped">0</span>
+                            </div>
+                            <div class="diag-item">
+                                <span class="diag-label">Routing Mode</span>
+                                <span class="diag-val" id="diag-route">Smart Proxy</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right / Channels Browser Pane -->
+            <section class="channels-pane">
+                <div class="channels-header">
+                    <div class="channels-header-title">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 11a9 9 0 0 1 9 9"></path><path d="M4 4a16 16 0 0 1 16 16"></path><circle cx="5" cy="19" r="1"></circle></svg>
+                        <span>Channel Guide</span>
+                    </div>
+                    <button type="button" class="action-btn" id="refresh-health-btn" onclick="if(window.streamHealthChecker){window.streamHealthChecker.clearCache();window.location.reload();}" title="Refresh all stream health checks">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                        <span>Refresh Checks</span>
+                    </button>
+                </div>
+
+                <div class="channels-content" id="channels-container">
+                    <!-- Channels rendered here -->
+                </div>
+            </section>
+        </main>
     </div>
 
-    <script>
-        const BASE_IPTV_URL = 'https://iptv-org.github.io/iptv';
-        const PROXY_URL = 'https://sports-proxy.md-daf001.workers.dev/?'; // Your Custom Proxy
+    <!-- Modals -->
 
-        const categories = [
-            { id: 'sports', name: 'Sports' },
-            { id: 'movies', name: 'Movies' },
-            { id: 'news', name: 'News' },
-            { id: 'entertainment', name: 'Entertainment' },
-            { id: 'documentary', name: 'Documentaries' },
-            { id: 'music', name: 'Music' },
-            { id: 'kids', name: 'Kids' },
-            { id: 'comedy', name: 'Comedy' }
-        ];
-
-        const countries = [
-            { id: 'bd', name: 'Bangladesh' },
-            { id: 'in', name: 'India' },
-            { id: 'us', name: 'United States' },
-            { id: 'uk', name: 'United Kingdom' },
-            { id: 'ca', name: 'Canada' },
-            { id: 'au', name: 'Australia' },
-            { id: 'pk', name: 'Pakistan' },
-            { id: 'ae', name: 'UAE' }
-        ];
-
-        const video = document.getElementById('video');
-        const channelList = document.getElementById('channel-list');
-        const currentChannelName = document.getElementById('current-channel-name');
-        const statusMsg = document.getElementById('status-msg');
-        const corsModal = document.getElementById('cors-modal');
-        
-        const filterType = document.getElementById('filter-type');
-        const filterValue = document.getElementById('filter-value');
-        const searchInput = document.getElementById('search-input');
-        
-        let hls;
-        let allChannels = []; 
-
-        function updateDropdowns() {
-            filterValue.innerHTML = '';
-            const type = filterType.value;
-            const dataList = type === 'category' ? categories : countries;
-
-            dataList.forEach(item => {
-                const option = document.createElement('option');
-                option.value = item.id;
-                option.textContent = item.name;
-                filterValue.appendChild(option);
-            });
-            fetchPlaylist();
-        }
-
-        async function fetchPlaylist() {
-            channelList.innerHTML = '<div class="loading">Downloading playlist...</div>';
-            searchInput.value = '';
-            const typeFolder = filterType.value === 'category' ? 'categories' : 'countries';
-            const playlistUrl = `${BASE_IPTV_URL}/${typeFolder}/${filterValue.value}.m3u`;
-
-            try {
-                const response = await fetch(playlistUrl);
-                if (!response.ok) throw new Error("Playlist not found");
-                const text = await response.text();
-                allChannels = parseM3U(text);
-                renderChannelList(allChannels);
-            } catch (error) {
-                channelList.innerHTML = '<div class="no-results">Error loading playlist or playlist is empty.</div>';
-            }
-        }
-
-        function parseM3U(m3uData) {
-            const lines = m3uData.split('\n');
-            const channels = [];
-            let currentChannel = {};
-
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i].trim();
-                if (line.startsWith('#EXTINF:')) {
-                    const nameMatch = line.match(/,(.+)$/);
-                    if (nameMatch) currentChannel.name = nameMatch[1];
-                    const logoMatch = line.match(/tvg-logo="([^"]+)"/);
-                    if (logoMatch) currentChannel.logo = logoMatch[1];
-                } else if (line.startsWith('http')) {
-                    currentChannel.url = line;
-                    channels.push(currentChannel);
-                    currentChannel = {}; 
-                }
-            }
-            return channels;
-        }
-
-        function renderChannelList(channels) {
-            channelList.innerHTML = ''; 
-            if (channels.length === 0) {
-                channelList.innerHTML = '<div class="no-results">No channels available in this list.</div>';
-                return;
-            }
-
-            channels.forEach(channel => {
-                const li = document.createElement('li');
-                li.className = 'channel-item';
-                const logoUrl = channel.logo || 'https://via.placeholder.com/40?text=TV';
-                li.innerHTML = `
-                    <img src="${logoUrl}" class="channel-logo" alt="${channel.name}" onerror="this.src='https://via.placeholder.com/40?text=TV'">
-                    <span>${channel.name}</span>
-                `;
-                li.onclick = (e) => {
-                    document.querySelectorAll('.channel-item').forEach(el => el.classList.remove('active-channel'));
-                    li.classList.add('active-channel');
-                    // Reset to false so it always tries direct connection first
-                    playStream(channel.url, channel.name, false); 
-                };
-                channelList.appendChild(li);
-            });
-        }
-
-        searchInput.addEventListener('keyup', (e) => {
-            const searchTerm = e.target.value.toLowerCase();
-            renderChannelList(allChannels.filter(channel => channel.name.toLowerCase().includes(searchTerm)));
-        });
-
-        filterType.addEventListener('change', updateDropdowns);
-        filterValue.addEventListener('change', fetchPlaylist);
-
-        function showCorsModal() { corsModal.classList.add('show'); }
-        function closeModal() { corsModal.classList.remove('show'); }
-
-        // --- SMART ROUTING ENGINE ---
-        // useProxy defaults to false. It will recall itself as true if direct fails.
-        function playStream(url, name, useProxy = false) {
-            currentChannelName.innerText = `Playing: ${name}`;
+    <!-- Multi-Source Playlist Manager Modal -->
+    <div id="sources-modal" class="modal-overlay">
+        <div class="modal-card" style="max-width: 600px; max-height: 85vh; display: flex; flex-direction: column;">
+            <div class="modal-header">
+                <div>
+                    <h3 class="modal-title">📚 Playlist Sources Manager</h3>
+                    <p style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Check multiple sources to load and aggregate thousands of channels simultaneously!</p>
+                </div>
+                <button type="button" class="modal-close-btn">&times;</button>
+            </div>
             
-            // Update UI status based on current routing attempt
-            if (useProxy) {
-                statusMsg.innerText = "Direct connection blocked. Routing through Proxy...";
-                statusMsg.style.color = "#ffaa00";
-            } else {
-                statusMsg.innerText = "Attempting direct connection...";
-                statusMsg.style.color = "#aaa";
-            }
+            <div style="display:flex;gap:8px;margin-bottom:12px;">
+                <button type="button" class="action-btn" id="select-all-sources-btn" style="font-size:0.75rem;padding:5px 10px;">Select All Sources</button>
+                <button type="button" class="action-btn" id="clear-all-sources-btn" style="font-size:0.75rem;padding:5px 10px;">Reset Selection</button>
+            </div>
 
-            if (Hls.isSupported()) {
-                if (hls) hls.destroy(); 
-                
-                // Configure HLS based on routing mode
-                const config = useProxy ? {
-                    xhrSetup: function(xhr, requestUrl) {
-                        xhr.open('GET', PROXY_URL + encodeURIComponent(requestUrl), true);
-                    }
-                } : {};
-                
-                hls = new Hls(config);
-                hls.loadSource(url); 
-                hls.attachMedia(video);
-                
-                hls.on(Hls.Events.MANIFEST_PARSED, function() {
-                    statusMsg.innerText = useProxy ? "Stream live (via Cloudflare Proxy)." : "Stream live (Direct Connection).";
-                    statusMsg.style.color = "#4CAF50";
-                    video.play().catch(e => console.log("Autoplay blocked"));
-                });
+            <!-- Scrollable list of sources -->
+            <div class="modal-body" style="flex:1;overflow-y:auto;padding-right:4px;" id="sources-list-container">
+                <!-- Sources rendered by JS -->
+            </div>
 
-                hls.on(Hls.Events.ERROR, function(event, data) {
-                    if (data.fatal) {
-                        if (!useProxy) {
-                            // ATTEMPT 1 FAILED: The direct connection crashed (likely CORS). 
-                            // Instantly re-run the function using the Proxy.
-                            console.warn("Direct fetch failed. Initiating Proxy Fallback.");
-                            playStream(url, name, true); 
-                        } else {
-                            // ATTEMPT 2 FAILED: The proxy also crashed (Geo-blocked or Dead Link).
-                            // Trigger the instruction modal.
-                            statusMsg.innerText = "Error: Stream blocked or offline.";
-                            statusMsg.style.color = "#ff4444";
-                            showCorsModal(); 
-                        }
-                    }
-                });
-            } 
-            // Fallback for Native Safari/iOS
-            else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                const targetUrl = useProxy ? PROXY_URL + encodeURIComponent(url) : url;
-                video.src = targetUrl;
-                
-                video.addEventListener('loadedmetadata', function() {
-                    statusMsg.innerText = useProxy ? "Stream live (via Cloudflare Proxy)." : "Stream live (Direct Connection).";
-                    statusMsg.style.color = "#4CAF50";
-                    video.play();
-                });
-                
-                video.addEventListener('error', function() {
-                    if (!useProxy) {
-                        playStream(url, name, true);
-                    } else {
-                        showCorsModal();
-                    }
-                });
-            }
-        }
+            <!-- Add Custom GitHub M3U URL Form -->
+            <div style="background:var(--bg-card);border:1px dashed var(--border-subtle);border-radius:var(--radius-sm);padding:12px;margin-bottom:14px;">
+                <div style="font-weight:600;font-size:0.82rem;color:var(--accent-cyan);margin-bottom:8px;">➕ Add Custom GitHub / M3U Playlist URL</div>
+                <div style="display:flex;flex-direction:column;gap:8px;">
+                    <input type="text" id="new-source-name" class="search-input" placeholder="Source Name (e.g. My GitHub TV List)" style="padding:7px 12px;font-size:0.8rem;">
+                    <div style="display:flex;gap:8px;">
+                        <input type="url" id="new-source-url" class="search-input" placeholder="Raw M3U/M3U8 URL (https://raw.githubusercontent.com/.../playlist.m3u8)" style="padding:7px 12px;font-size:0.8rem;flex:1;">
+                        <button type="button" class="action-btn" id="add-custom-source-btn" style="background:var(--accent-cyan);color:#000;font-weight:700;">Add</button>
+                    </div>
+                </div>
+            </div>
 
-        updateDropdowns();
-    </script>
+            <div class="modal-actions">
+                <button type="button" class="action-btn modal-cancel-btn">Cancel</button>
+                <button type="button" class="action-btn" id="apply-sources-btn" style="background:linear-gradient(135deg, #00d2ff, #6366f1);color:#fff;font-weight:700;padding:8px 18px;">Apply & Load Merged Channels</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Geo-Bypass & Cloudflare Worker Guide Modal -->
+    <div id="geo-guide-modal" class="modal-overlay">
+        <div class="modal-card" style="max-width: 620px; max-height: 85vh; display: flex; flex-direction: column;">
+            <div class="modal-header">
+                <div>
+                    <h3 class="modal-title">🌍 Bypassing Location & Geo-Blocked Streams</h3>
+                    <p style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Solutions for domestic IP checks, token expirations, and referer blocks.</p>
+                </div>
+                <button type="button" class="modal-close-btn">&times;</button>
+            </div>
+            <div class="modal-body" style="flex:1;overflow-y:auto;">
+                <h4 style="color:#fff;font-size:0.9rem;margin-bottom:6px;">1. Automatic Server Mirrors (Built-in)</h4>
+                <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:14px;">
+                    When you aggregate multiple sources, channels like beIN Sports, Sky Sports, or ATN Bangla have multiple mirrors. If Server 1 is location-blocked, use the <b>Server dropdown</b> in the player bar or let the auto-failover switch to Server 2/3.
+                </p>
+
+                <h4 style="color:#fff;font-size:0.9rem;margin-bottom:6px;">2. Deploy the Geo-Bypass Cloudflare Worker Script</h4>
+                <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:8px;">
+                    Streams often return HTTP 403 because Cloudflare forwards your domestic IP in <code>cf-connecting-ip</code>, or rejects browser User-Agents. We created a production-ready script in <code>cloudflare_worker.js</code> that strips IP headers and emulates VLC media player!
+                </p>
+                <div class="code-preview-box" id="worker-code-box">// cloudflare_worker.js ready to deploy
+// 1. Visit dash.cloudflare.com -> Workers & Pages
+// 2. Open your worker (e.g. sports-proxy)
+// 3. Paste cloudflare_worker.js and click Deploy!</div>
+                <button type="button" class="action-btn" style="margin-top:8px;font-size:0.75rem;" onclick="navigator.clipboard.writeText(`// Refer to cloudflare_worker.js in project directory`);alert('Worker code path copied to clipboard!');">Copy Worker Instructions</button>
+
+                <h4 style="color:#fff;font-size:0.9rem;margin-top:16px;margin-bottom:6px;">3. Domestic-Only Verified Channels</h4>
+                <p style="font-size:0.82rem;color:var(--text-secondary);">
+                    Certain national channels (e.g., local Bangladesh or Indian cable feeds) strictly require residential domestic ISP IPs. For those channels, install the free <b>Allow CORS</b> Chrome extension or use a domestic proxy/VPN.
+                </p>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="action-btn modal-cancel-btn">Got It</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Smart Routing Switcher Modal -->
+    <div id="routing-modal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">Smart Stream Routing</h3>
+                <button type="button" class="modal-close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom:12px;">Choose how streams connect to bypass CORS and Geo-restrictions:</p>
+                <div style="display:flex;flex-direction:column;gap:10px;">
+                    <button type="button" class="action-btn routing-option-btn" data-mode="auto" style="justify-content:flex-start;padding:12px;">
+                        <div>
+                            <div style="font-weight:700;color:var(--accent-cyan);">⚡ Smart Auto (Recommended)</div>
+                            <div style="font-size:0.75rem;color:var(--text-muted);">Auto-detects HTTP/HTTPS & CORS requirements, routing seamlessly.</div>
+                        </div>
+                    </button>
+                    <button type="button" class="action-btn routing-option-btn" data-mode="proxy" style="justify-content:flex-start;padding:12px;">
+                        <div>
+                            <div style="font-weight:700;color:var(--accent-emerald);">🟢 Cloudflare Proxy Always</div>
+                            <div style="font-size:0.75rem;color:var(--text-muted);">Forces all manifest and media segments through the Cloudflare Worker proxy.</div>
+                        </div>
+                    </button>
+                    <button type="button" class="action-btn routing-option-btn" data-mode="direct" style="justify-content:flex-start;padding:12px;">
+                        <div>
+                            <div style="font-weight:700;color:#fff;">Direct Media Server</div>
+                            <div style="font-size:0.75rem;color:var(--text-muted);">Connects without proxy (requires server to allow CORS).</div>
+                        </div>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="action-btn modal-cancel-btn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Stream Modal -->
+    <div id="custom-modal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">Play Custom Stream</h3>
+                <button type="button" class="modal-close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom:14px;">Enter any HLS (.m3u8), MP4, or live video URL:</p>
+                <div style="display:flex;flex-direction:column;gap:10px;">
+                    <input type="text" id="custom-name-input" class="search-input" placeholder="Channel Name (e.g. My Sports Stream)">
+                    <input type="url" id="custom-url-input" class="search-input" placeholder="Stream URL (https://.../playlist.m3u8)">
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="action-btn modal-cancel-btn">Cancel</button>
+                <button type="button" class="action-btn" id="save-custom-btn" style="background:var(--accent-cyan);color:#000;font-weight:700;">Play Stream</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/proxy-loader.js"></script>
+    <script src="js/health-checker.js"></script>
+    <script src="js/app.js"></script>
 </body>
 </html>
