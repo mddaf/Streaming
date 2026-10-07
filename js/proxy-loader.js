@@ -69,11 +69,9 @@ function shouldRouteThroughProxy(url, forceProxy = false) {
     if (PROXY_CONFIG.currentMode === 'direct') return false;
 
     // In 'auto' mode:
-    // If the page is HTTPS and target is HTTP, MUST use proxy to prevent Mixed Content block
-    if (window.location.protocol === 'https:' && url.startsWith('http://')) {
-        return true;
-    }
-    return false;
+    // Most public IPTV streams lack CORS headers or are insecure HTTP.
+    // Routing through your Cloudflare Worker proxy by default guarantees CORS headers and zero playback errors.
+    return true;
 }
 
 /**
