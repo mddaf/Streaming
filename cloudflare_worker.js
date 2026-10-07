@@ -124,8 +124,8 @@ async function handleProxyRequest(request) {
 
     try {
         const targetParsed = new URL(targetUrl);
-        const workerOrigin = new URL(request.url).origin;
-        const workerBaseUrl = `${workerOrigin}/`;
+        const reqParsed = new URL(request.url);
+        const workerBaseUrl = `${reqParsed.origin}${reqParsed.pathname.endsWith('/') ? reqParsed.pathname : reqParsed.pathname + '/'}`;
 
         // 3. Construct headers for upstream media server
         const forwardHeaders = new Headers();
@@ -139,8 +139,9 @@ async function handleProxyRequest(request) {
             forwardHeaders.set('User-Agent', 'VLC/3.0.18 LibVLC/3.0.18');
         }
 
-        // Auto-Referer: Automatically set Referer to target origin to bypass hotlink protection
+        // Auto-Referer & Origin: Automatically set to target origin to bypass hotlink protection
         forwardHeaders.set('Referer', `${targetParsed.protocol}//${targetParsed.host}/`);
+        forwardHeaders.set('Origin', `${targetParsed.protocol}//${targetParsed.host}`);
         forwardHeaders.set('Accept', '*/*');
         forwardHeaders.set('Accept-Encoding', 'identity'); // Avoid compression mismatch on manifests
 
@@ -174,10 +175,12 @@ async function handleProxyRequest(request) {
                            contentType.includes('mpegurl') ||
                            contentType.includes('application/x-mpegURL');
 
-        // For manifests: disable cache and rewrite relative segment URLs to stay proxied
+        // For manifests: disable cache, remove old content-length/encoding, and rewrite relative segment URLs
         if (isManifest && upstreamResponse.status === 200) {
             responseHeaders.set('Cache-Control', 'no-cache, no-store, must-revalidate');
             responseHeaders.set('Content-Type', 'application/vnd.apple.mpegurl; charset=utf-8');
+            responseHeaders.delete('content-length');
+            responseHeaders.delete('content-encoding');
 
             const manifestText = await upstreamResponse.text();
             const rewrittenManifest = rewriteManifestUrls(manifestText, targetUrl, workerBaseUrl);

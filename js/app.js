@@ -12,6 +12,21 @@
     // Default Playlists to Merge Simultaneously on Launch
     const DEFAULT_PLAYLIST_SOURCES = [
         {
+            name: 'FTV Local BDIX (172.16.15.5)',
+            url: './ftv_channels.m3u',
+            defaultCountry: 'bd'
+        },
+        {
+            name: 'Verified Sports Live HD',
+            url: './working_iptv_org_sports.m3u',
+            defaultCategory: 'Sports'
+        },
+        {
+            name: 'Verified Bangladesh Live',
+            url: './working_iptv_org_bd.m3u',
+            defaultCountry: 'bd'
+        },
+        {
             name: 'Free-TV Global HD',
             url: 'https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8',
             defaultCategory: 'General'
@@ -137,7 +152,7 @@
         selectedCountry: 'all',
         customSources: [],
         searchQuery: '',
-        hideOffline: true, // Auto-hide offline channels by default
+        hideOffline: false, // Show all channels with live/dead status badges by default
         viewMode: 'grid', // 'grid' | 'list'
         routingMode: 'auto', // 'auto' | 'proxy' | 'direct'
         masterChannels: [], // Unified multi-source merged catalog
@@ -150,7 +165,10 @@
         theaterMode: false,
         diagnosticsOpen: false,
         diagTimer: null,
-        isLoading: false
+        isLoading: false,
+        bdixServers: [],
+        bdixActiveCategory: 'all',
+        bdixSearchQuery: ''
     };
 
     // DOM Elements
@@ -199,7 +217,13 @@
         applySourcesBtn: document.getElementById('apply-sources-btn'),
         geoAlertBanner: document.getElementById('geo-alert-banner'),
         openSourcesBtn: document.getElementById('open-sources-btn'),
-        openGeoGuideBtn: document.getElementById('open-geo-guide-btn')
+        openGeoGuideBtn: document.getElementById('open-geo-guide-btn'),
+        openBdixHubBtn: document.getElementById('open-bdix-hub-btn'),
+        bdixHubModal: document.getElementById('bdix-hub-modal'),
+        bdixSearchInput: document.getElementById('bdix-search-input'),
+        bdixCardsGrid: document.getElementById('bdix-cards-grid'),
+        bdixCountLabel: document.getElementById('bdix-count-label'),
+        refreshFtvBtn: document.getElementById('refresh-ftv-btn')
     };
 
     /* --------------------------------------------------------------------------
@@ -343,7 +367,7 @@
             .replace(/\s*\[.*?\]/g, '')
             .replace(/hd$/i, '')
             .replace(/fhd$/i, '')
-            .replace(/[^a-z0-9]/g, ' ')
+            .replace(/[^a-z0-9]/g, '')
             .trim();
     }
 
@@ -656,9 +680,16 @@
         if (status === 'online') {
             statusBadgeHtml = `<span class="card-status-badge status-badge-online" title="Stream Verified Live"><span class="live-pulse-dot" style="width:6px;height:6px;"></span> Live</span>`;
         } else if (status === 'offline') {
-            const details = window.streamHealthChecker.getCached(channel.url);
+            const details = window.streamHealthChecker ? window.streamHealthChecker.getCached(channel.url) : null;
+            const errType = details ? details.errorType : null;
             const reason = details ? details.reason : 'Offline / Blocked';
-            statusBadgeHtml = `<span class="card-status-badge status-badge-offline" title="${reason}">Offline</span>`;
+            if (errType === 'dead') {
+                statusBadgeHtml = `<span class="card-status-badge status-badge-dead" title="${reason}">🔗 Dead (404)</span>`;
+            } else if (errType === 'geo') {
+                statusBadgeHtml = `<span class="card-status-badge status-badge-geo" title="${reason}">🌍 Geo (403)</span>`;
+            } else {
+                statusBadgeHtml = `<span class="card-status-badge status-badge-offline" title="${reason}">Offline</span>`;
+            }
         } else if (status === 'checking') {
             statusBadgeHtml = `<span class="card-status-badge status-badge-checking" title="Testing availability...">Checking</span>`;
         }
@@ -740,9 +771,18 @@
 
         let statusBadgeHtml = '';
         if (status === 'online') {
-            statusBadgeHtml = `<span class="badge-pill badge-health-online"><span class="live-pulse-dot" style="width:5px;height:5px;"></span> Live</span>`;
+            statusBadgeHtml = `<span class="badge-pill badge-health-online" title="Stream Verified Live"><span class="live-pulse-dot" style="width:5px;height:5px;"></span> Live</span>`;
         } else if (status === 'offline') {
-            statusBadgeHtml = `<span class="badge-pill badge-health-offline">Offline</span>`;
+            const details = window.streamHealthChecker ? window.streamHealthChecker.getCached(channel.url) : null;
+            const errType = details ? details.errorType : null;
+            const reason = details ? details.reason : 'Offline';
+            if (errType === 'dead') {
+                statusBadgeHtml = `<span class="badge-pill badge-health-dead" title="${reason}">🔗 404</span>`;
+            } else if (errType === 'geo') {
+                statusBadgeHtml = `<span class="badge-pill badge-health-geo" title="${reason}">🌍 403</span>`;
+            } else {
+                statusBadgeHtml = `<span class="badge-pill badge-health-offline" title="${reason}">Offline</span>`;
+            }
         }
 
         const logoUrl = channel.logo || '';
@@ -812,8 +852,9 @@
             cards.forEach(card => {
                 if (!entry) return;
 
-                card.classList.remove('status-online', 'status-offline', 'status-checking');
+                card.classList.remove('status-online', 'status-offline', 'status-checking', 'status-geo', 'status-dead');
                 card.classList.add(`status-${entry.status}`);
+                if (entry.errorType) card.classList.add(`status-${entry.errorType}`);
 
                 if (state.hideOffline && entry.status === 'offline') {
                     card.style.display = 'none';
@@ -822,18 +863,57 @@
                     card.style.display = '';
                 }
 
+                // Update Grid Card Badge
                 const badge = card.querySelector('.card-status-badge');
                 if (badge) {
-                    badge.className = `card-status-badge status-badge-${entry.status}`;
+                    badge.className = 'card-status-badge';
                     if (entry.status === 'online') {
+                        badge.classList.add('status-badge-online');
                         badge.innerHTML = `<span class="live-pulse-dot" style="width:6px;height:6px;"></span> Live`;
                         badge.title = entry.reason || 'Stream Verified Live';
                     } else if (entry.status === 'offline') {
-                        badge.innerHTML = 'Offline';
-                        badge.title = entry.reason || 'Offline';
+                        if (entry.errorType === 'dead') {
+                            badge.classList.add('status-badge-dead');
+                            badge.innerHTML = '🔗 Dead (404)';
+                            badge.title = entry.reason || 'Dead Link (404 Not Found)';
+                        } else if (entry.errorType === 'geo') {
+                            badge.classList.add('status-badge-geo');
+                            badge.innerHTML = '🌍 Geo (403)';
+                            badge.title = entry.reason || 'Geo-Blocked (403 Forbidden)';
+                        } else {
+                            badge.classList.add('status-badge-offline');
+                            badge.innerHTML = 'Offline';
+                            badge.title = entry.reason || 'Offline / Blocked';
+                        }
                     } else if (entry.status === 'checking') {
+                        badge.classList.add('status-badge-checking');
                         badge.innerHTML = 'Checking';
                         badge.title = 'Testing availability...';
+                    }
+                }
+
+                // Update List View Badge
+                const listBadge = card.querySelector('.badge-pill');
+                if (listBadge) {
+                    listBadge.className = 'badge-pill';
+                    if (entry.status === 'online') {
+                        listBadge.classList.add('badge-health-online');
+                        listBadge.innerHTML = `<span class="live-pulse-dot" style="width:5px;height:5px;"></span> Live`;
+                        listBadge.title = entry.reason || 'Stream Verified Live';
+                    } else if (entry.status === 'offline') {
+                        if (entry.errorType === 'dead') {
+                            listBadge.classList.add('badge-health-dead');
+                            listBadge.innerHTML = '🔗 404';
+                            listBadge.title = entry.reason || 'Dead Link (404)';
+                        } else if (entry.errorType === 'geo') {
+                            listBadge.classList.add('badge-health-geo');
+                            listBadge.innerHTML = '🌍 403';
+                            listBadge.title = entry.reason || 'Geo-Blocked (403)';
+                        } else {
+                            listBadge.classList.add('badge-health-offline');
+                            listBadge.innerHTML = 'Offline';
+                            listBadge.title = entry.reason || 'Offline';
+                        }
                     }
                 }
             });
@@ -988,18 +1068,47 @@
                 }
             });
 
-            hls.on(Hls.Events.ERROR, (event, data) => {
+            hls.on(Hls.Events.ERROR, async (event, data) => {
                 if (data.fatal) {
-                    console.warn('HLS Error on Server', serverIndex, ':', data.type, data.details);
+                    console.warn('HLS Error on Server', serverIndex, ':', data.type, data.details, data);
 
-                    // Step 1: Direct failed -> Retry Cloudflare Proxy
-                    if (!needProxy) {
+                    // Auto-refresh token for FTV local stream if token expired (HTTP 403 / 404)
+                    if (streamUrl.includes('172.16.15.5')) {
+                        const ftvMatch = streamUrl.match(/172\.16\.15\.5:8666\/([^/]+)\//);
+                        const streamId = ftvMatch ? ftvMatch[1] : null;
+                        if (streamId) {
+                            try {
+                                elements.currentChannelStatus.innerHTML = '<span style="color:var(--accent-cyan)">Refreshing local FTV token...</span>';
+                                const ftvRes = await fetch(`http://172.16.15.5/play.php?stream=${encodeURIComponent(streamId)}`);
+                                if (ftvRes.ok) {
+                                    const ftvHtml = await ftvRes.text();
+                                    const srcMatch = ftvHtml.match(/var videoSrc = ['"]([^'"]+)['"]/);
+                                    if (srcMatch && srcMatch[1] && srcMatch[1] !== streamUrl) {
+                                        currentServer.url = srcMatch[1];
+                                        hls.loadSource(srcMatch[1]);
+                                        hls.startLoad();
+                                        return;
+                                    }
+                                }
+                            } catch (e) {
+                                console.warn('FTV token refresh failed:', e.message);
+                            }
+                        }
+                    }
+
+                    // Detect HTTP error code from HLS error data
+                    const httpCode = data.response && data.response.code ? data.response.code : 0;
+                    const isDeadLink = httpCode === 404 || httpCode === 410;
+                    const isGeoBlocked = httpCode === 403 || httpCode === 451;
+
+                    // Step 1: Direct failed -> Retry Cloudflare Proxy (only if not a dead link)
+                    if (!needProxy && !isDeadLink) {
                         playChannel(channel, serverIndex, true, 0);
                         return;
                     }
 
-                    // Step 2: Primary proxy failed -> Try Alternate Global Proxy
-                    if (needProxy && proxyIndex === 0) {
+                    // Step 2: Primary proxy failed -> Try Alternate Global Proxy (only if not dead link)
+                    if (needProxy && proxyIndex === 0 && !isDeadLink) {
                         playChannel(channel, serverIndex, true, 1);
                         return;
                     }
@@ -1012,9 +1121,17 @@
                         return;
                     }
 
-                    // Step 4: Stream location-blocked or offline
-                    elements.currentChannelStatus.innerHTML = '<span style="color:var(--accent-rose)">⚠️ Stream restricted or geo-blocked</span>';
-                    showGeoAlertBanner(channel, servers);
+                    // Step 4: Determine error type and show appropriate message
+                    if (isDeadLink) {
+                        elements.currentChannelStatus.innerHTML = '<span style="color:var(--accent-rose)">🔗 Stream URL Expired / Not Found (404)</span>';
+                        showStreamErrorBanner(channel, servers, 'dead');
+                    } else if (isGeoBlocked) {
+                        elements.currentChannelStatus.innerHTML = '<span style="color:var(--accent-rose)">🌍 Stream Geo-Blocked (403 Forbidden)</span>';
+                        showStreamErrorBanner(channel, servers, 'geo');
+                    } else {
+                        elements.currentChannelStatus.innerHTML = '<span style="color:var(--accent-rose)">⚠️ Stream Unavailable — CORS or Network Error</span>';
+                        showStreamErrorBanner(channel, servers, 'cors');
+                    }
                 }
             });
         } 
@@ -1037,7 +1154,7 @@
                     playChannel(channel, serverIndex + 1);
                 } else {
                     elements.currentChannelStatus.innerHTML = '<span style="color:var(--accent-rose)">⚠️ Stream unavailable</span>';
-                    showGeoAlertBanner(channel, servers);
+                    showStreamErrorBanner(channel, servers, 'unknown');
                 }
             });
         }
@@ -1046,25 +1163,50 @@
     }
 
     /**
-     * Show Geo-Restriction alert banner with instant actionable solutions
+     * Show stream error banner with smart messaging based on error type:
+     * - 'dead': 404 / expired URL
+     * - 'geo': 403 / geo-blocked
+     * - 'cors': CORS / network error
+     * - 'unknown': fallback
      */
-    function showGeoAlertBanner(channel, servers) {
+    function showStreamErrorBanner(channel, servers, errorType) {
         if (!elements.geoAlertBanner) return;
 
         const hasAltServers = servers && servers.length > 1;
+
+        let icon, title, description;
+        if (errorType === 'dead') {
+            icon = '🔗';
+            title = 'Stream URL Expired or Not Found';
+            description = 'This stream link (404) is dead or the provider rotated its URL. Try an alternate server or update the URL via Sources.';
+        } else if (errorType === 'geo') {
+            icon = '🌍';
+            title = 'Stream Geo-Blocked (403 Forbidden)';
+            description = 'This stream restricts access based on your country or IP. Try an alternate server — some mirrors are not geo-restricted.';
+        } else if (errorType === 'cors') {
+            icon = '🔒';
+            title = 'CORS / Network Error';
+            description = 'The stream host rejected the request. This is usually a CORS policy or mixed content block.';
+        } else {
+            icon = '⚠️';
+            title = 'Stream Unavailable';
+            description = 'Could not load this stream. Try an alternate server or reload.';
+        }
+
         elements.geoAlertBanner.style.display = 'block';
         elements.geoAlertBanner.innerHTML = `
             <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
                 <div style="display:flex;align-items:center;gap:10px;">
-                    <span style="font-size:1.3rem;">🌍</span>
+                    <span style="font-size:1.3rem;">${icon}</span>
                     <div>
-                        <div style="font-weight:700;color:var(--accent-amber);">Stream Geo-Blocked or Restricted</div>
-                        <div style="font-size:0.78rem;color:var(--text-secondary);">This stream restricts access based on location, domestic ISP, or headers.</div>
+                        <div style="font-weight:700;color:var(--accent-amber);">${title}</div>
+                        <div style="font-size:0.78rem;color:var(--text-secondary);">${description}</div>
                     </div>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
                     ${hasAltServers ? `<button type="button" class="action-btn" id="geo-btn-next-mirror" style="background:var(--accent-cyan);color:#000;font-weight:700;">🔄 Try Alternate Server</button>` : ''}
-                    <button type="button" class="action-btn" id="geo-btn-alt-proxy">🌐 Force Global Proxy</button>
+                    ${errorType !== 'dead' ? `<button type="button" class="action-btn" id="geo-btn-alt-proxy">🌐 Force Global Proxy</button>` : ''}
+                    <button type="button" class="action-btn" id="geo-btn-reload">🔃 Reload</button>
                     <button type="button" class="action-btn" id="geo-btn-guide">ℹ️ Geo-Tips</button>
                 </div>
             </div>
@@ -1073,18 +1215,34 @@
         const nextMirrorBtn = document.getElementById('geo-btn-next-mirror');
         if (nextMirrorBtn) {
             nextMirrorBtn.onclick = () => {
+                elements.geoAlertBanner.style.display = 'none';
                 const nextIdx = (state.currentServerIndex + 1) % servers.length;
                 playChannel(channel, nextIdx);
             };
         }
 
-        document.getElementById('geo-btn-alt-proxy').onclick = () => {
-            playChannel(channel, state.currentServerIndex, true, 1);
+        const altProxyBtn = document.getElementById('geo-btn-alt-proxy');
+        if (altProxyBtn) {
+            altProxyBtn.onclick = () => {
+                playChannel(channel, state.currentServerIndex, true, 1);
+            };
+        }
+
+        document.getElementById('geo-btn-reload').onclick = () => {
+            elements.geoAlertBanner.style.display = 'none';
+            playChannel(channel, state.currentServerIndex);
         };
 
         document.getElementById('geo-btn-guide').onclick = () => {
             openModal(elements.geoGuideModal);
         };
+    }
+
+    /**
+     * Legacy alias kept for compatibility
+     */
+    function showGeoAlertBanner(channel, servers) {
+        showStreamErrorBanner(channel, servers, 'geo');
     }
 
     function populateQualityLevels(levels) {
@@ -1177,6 +1335,124 @@
     }
 
     /* --------------------------------------------------------------------------
+       BDIX & Local FTP Media Hub Manager
+       -------------------------------------------------------------------------- */
+    async function loadAndRenderBdixHub() {
+        if (!state.bdixServers || state.bdixServers.length === 0) {
+            try {
+                const res = await fetch('./bdix_ftp_servers.json');
+                if (res.ok) {
+                    state.bdixServers = await res.json();
+                }
+            } catch (e) {
+                console.warn('Could not load bdix_ftp_servers.json:', e);
+            }
+        }
+        renderBdixCards();
+    }
+
+    function renderBdixCards() {
+        if (!elements.bdixCardsGrid) return;
+        elements.bdixCardsGrid.innerHTML = '';
+
+        const servers = state.bdixServers || [];
+        const query = state.bdixSearchQuery || '';
+        const cat = state.bdixActiveCategory || 'all';
+
+        const filtered = servers.filter(s => {
+            // Category check
+            if (cat === 'lan' && s.tier !== 'lan') return false;
+            if (cat === 'ftp' && s.category !== 'ftp') return false;
+            if (cat === 'movies' && s.category !== 'movies') return false;
+            if (cat === 'tv' && s.category !== 'tv') return false;
+
+            // Search query check
+            if (query) {
+                const matchStr = `${s.name} ${s.url} ${s.description} ${s.category} ${s.speed}`.toLowerCase();
+                if (!matchStr.includes(query)) return false;
+            }
+            return true;
+        });
+
+        if (elements.bdixCountLabel) {
+            elements.bdixCountLabel.textContent = `Showing ${filtered.length} of ${servers.length} verified servers`;
+        }
+
+        if (filtered.length === 0) {
+            elements.bdixCardsGrid.innerHTML = `
+                <div style="grid-column: 1 / -1; text-align: center; padding: 24px; color: var(--text-muted);">
+                    <p>No servers match your search filter.</p>
+                </div>
+            `;
+            return;
+        }
+
+        filtered.forEach(srv => {
+            const card = document.createElement('div');
+            card.style.background = 'var(--bg-card)';
+            card.style.border = '1px solid var(--border-subtle)';
+            card.style.borderRadius = 'var(--radius-sm)';
+            card.style.padding = '12px';
+            card.style.display = 'flex';
+            card.style.flexDirection = 'column';
+            card.style.justifyContent = 'space-between';
+            card.style.gap = '8px';
+            card.style.transition = 'var(--transition-fast)';
+
+            const isLan = srv.tier === 'lan';
+            const tierBadgeColor = isLan ? 'var(--accent-emerald)' : 'var(--accent-cyan)';
+            const tierBadgeBg = isLan ? 'rgba(16,185,129,0.15)' : 'rgba(0,210,255,0.15)';
+
+            card.innerHTML = `
+                <div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:4px;">
+                        <span style="font-weight:700;color:#fff;font-size:0.88rem;">${srv.name}</span>
+                        <span style="font-size:0.65rem;background:${tierBadgeBg};color:${tierBadgeColor};padding:2px 6px;border-radius:4px;font-weight:700;white-space:nowrap;">
+                            ${isLan ? '⚡ ' + srv.speed : '🌐 ' + srv.speed}
+                        </span>
+                    </div>
+                    <div style="font-size:0.7rem;color:var(--text-muted);word-break:break-all;margin-bottom:6px;font-family:monospace;">
+                        ${srv.url}
+                    </div>
+                    <p style="font-size:0.74rem;color:var(--text-secondary);line-height:1.4;margin:0;">
+                        ${srv.description || ''}
+                    </p>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;margin-top:4px;">
+                    <a href="${srv.url}" target="_blank" rel="noopener noreferrer" class="action-btn" style="flex:1;text-decoration:none;font-size:0.72rem;padding:5px 8px;justify-content:center;background:rgba(0,210,255,0.1);color:var(--accent-cyan);border-color:rgba(0,210,255,0.3);">
+                        Open Portal ↗
+                    </a>
+                    <button type="button" class="action-btn copy-url-btn" data-url="${srv.url}" style="font-size:0.72rem;padding:5px 8px;" title="Copy server URL">
+                        📋 Copy
+                    </button>
+                </div>
+            `;
+
+            // Hover effect
+            card.addEventListener('mouseenter', () => {
+                card.style.borderColor = isLan ? 'rgba(16,185,129,0.5)' : 'rgba(0,210,255,0.5)';
+                card.style.transform = 'translateY(-2px)';
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.borderColor = 'var(--border-subtle)';
+                card.style.transform = 'none';
+            });
+
+            // Copy button
+            const copyBtn = card.querySelector('.copy-url-btn');
+            copyBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                navigator.clipboard.writeText(srv.url).then(() => {
+                    copyBtn.textContent = '✅ Copied!';
+                    setTimeout(() => { copyBtn.textContent = '📋 Copy'; }, 1500);
+                });
+            });
+
+            elements.bdixCardsGrid.appendChild(card);
+        });
+    }
+
+    /* --------------------------------------------------------------------------
        Diagnostics & Stats Monitor
        -------------------------------------------------------------------------- */
     function startDiagnosticsTimer() {
@@ -1246,10 +1522,13 @@
         });
 
         // Hide Offline Toggle
-        elements.hideOfflineToggle.addEventListener('change', (e) => {
-            state.hideOffline = e.target.checked;
-            applyFiltersAndRender();
-        });
+        if (elements.hideOfflineToggle) {
+            elements.hideOfflineToggle.checked = state.hideOffline;
+            elements.hideOfflineToggle.addEventListener('change', (e) => {
+                state.hideOffline = e.target.checked;
+                applyFiltersAndRender();
+            });
+        }
 
         // View Mode Toggle (Grid vs List)
         document.getElementById('view-grid-btn').addEventListener('click', () => {
@@ -1310,6 +1589,52 @@
         if (elements.openGeoGuideBtn) {
             elements.openGeoGuideBtn.addEventListener('click', () => {
                 openModal(elements.geoGuideModal);
+            });
+        }
+
+        // Open BDIX & FTP Hub Modal
+        if (elements.openBdixHubBtn) {
+            elements.openBdixHubBtn.addEventListener('click', () => {
+                loadAndRenderBdixHub();
+                openModal(elements.bdixHubModal);
+            });
+        }
+
+        // BDIX Search Input inside Modal
+        if (elements.bdixSearchInput) {
+            elements.bdixSearchInput.addEventListener('input', (e) => {
+                state.bdixSearchQuery = e.target.value.toLowerCase().trim();
+                renderBdixCards();
+            });
+        }
+
+        // BDIX Category Filter Chips inside Modal
+        document.querySelectorAll('#bdix-filter-chips [data-bdix-cat]').forEach(chip => {
+            chip.addEventListener('click', () => {
+                document.querySelectorAll('#bdix-filter-chips [data-bdix-cat]').forEach(c => c.classList.remove('active'));
+                chip.classList.add('active');
+                state.bdixActiveCategory = chip.getAttribute('data-bdix-cat');
+                renderBdixCards();
+            });
+        });
+
+        // Rescan FTV Channels Button
+        if (elements.refreshFtvBtn) {
+            elements.refreshFtvBtn.addEventListener('click', async () => {
+                elements.refreshFtvBtn.disabled = true;
+                const prevText = elements.refreshFtvBtn.textContent;
+                elements.refreshFtvBtn.textContent = '⏳ Rescanning...';
+                try {
+                    await loadAndMergeAllSources();
+                    elements.refreshFtvBtn.textContent = '✅ Rescanned!';
+                } catch (e) {
+                    console.error('Error rescanning FTV:', e);
+                    elements.refreshFtvBtn.textContent = '❌ Error';
+                }
+                setTimeout(() => {
+                    elements.refreshFtvBtn.disabled = false;
+                    elements.refreshFtvBtn.textContent = prevText;
+                }, 2000);
             });
         }
 

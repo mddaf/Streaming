@@ -181,14 +181,19 @@ class StreamHealthChecker {
 
     /**
      * Probe a single stream URL
+     * Returns: { status: 'online'|'offline', code, reason, errorType }
+     * errorType: 'dead' (404/410) | 'geo' (403/451) | 'cors' | 'timeout' | null
      */
     async probeSingleUrl(url, timeoutMs) {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-        const testTarget = window.SmartProxyEngine 
-            ? window.SmartProxyEngine.buildProxyUrl(url, 0)
-            : `https://sports-proxy.md-daf001.workers.dev/?${encodeURIComponent(url)}`;
+        const isLocalIp = url.includes('172.16.') || url.includes('192.168.') || url.includes('10.') || url.includes('localhost') || url.includes('127.0.0.1');
+        const testTarget = isLocalIp
+            ? url
+            : (window.SmartProxyEngine 
+                ? window.SmartProxyEngine.buildProxyUrl(url, 0)
+                : `https://sports-proxy.md-daf001.workers.dev/?${encodeURIComponent(url)}`);
 
         try {
             const response = await fetch(testTarget, {
@@ -203,25 +208,45 @@ class StreamHealthChecker {
             clearTimeout(timer);
 
             if (!response.ok) {
+                const code = response.status;
+                const isDeadLink = code === 404 || code === 410;
+                const isGeoBlocked = code === 403 || code === 451;
                 return {
                     status: 'offline',
-                    code: response.status,
-                    reason: `HTTP ${response.status} (${response.statusText || 'Error'})`
+                    code,
+                    errorType: isDeadLink ? 'dead' : isGeoBlocked ? 'geo' : 'error',
+                    reason: isDeadLink
+                        ? `🔗 Dead Link (${code})` 
+                        : isGeoBlocked 
+                            ? `🌍 Geo-Blocked (${code})`
+                            : `HTTP ${code} (${response.statusText || 'Error'})`
                 };
             }
 
+            // 200/206 OK - stream is reachable through proxy
+            // Note: With worker manifest rewriting enabled, we accept 200 even without #EXTM3U
+            // (worker rewrites segment URLs inline, so body content may start with proxied lines)
             const text = await response.text();
-            if (text.includes('#EXTM3U') || text.includes('#EXT-X-')) {
-                return { status: 'online', code: 200, reason: 'Stream Verified Live' };
+            const isM3U = text.includes('#EXTM3U') || text.includes('#EXT-X-') || text.includes('#EXTINF');
+            
+            if (isM3U || response.status === 206) {
+                return { status: 'online', code: 200, errorType: null, reason: 'Stream Verified Live' };
             }
 
-            return { status: 'offline', code: response.status, reason: 'Invalid Manifest' };
+            // Got 200 but content might be HTML error page
+            if (text.includes('<!DOCTYPE') || text.includes('<html')) {
+                return { status: 'offline', code: 200, errorType: 'cors', reason: 'Got HTML instead of stream (blocked or redirected to login page)' };
+            }
+
+            // Otherwise accept 200 as online (some streams return binary or segment data)
+            return { status: 'online', code: 200, errorType: null, reason: 'Stream Accessible' };
         } catch (err) {
             clearTimeout(timer);
             const isTimeout = err.name === 'AbortError';
             return {
                 status: 'offline',
                 code: 0,
+                errorType: isTimeout ? 'timeout' : 'cors',
                 reason: isTimeout ? 'Connection Timed Out' : 'Server Unreachable / Blocked'
             };
         }

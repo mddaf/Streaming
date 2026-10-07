@@ -1,0 +1,209 @@
+[
+  {
+    "name": "FTV Local Live TV",
+    "url": "http://172.16.15.5/",
+    "category": "tv",
+    "tier": "lan",
+    "speed": "LAN 1 Gbps (Zero Buffer)",
+    "description": "77 Live TV channels including T Sports HD, Sony TEN 1-5, Star Sports 1-3 & Select HD, Maasranga, Somoy, etc.",
+    "status": "online"
+  },
+  {
+    "name": "FTPmedia.net Portal",
+    "url": "http://10.1.1.1/",
+    "category": "lan",
+    "tier": "lan",
+    "speed": "LAN 1 Gbps (Zero Buffer)",
+    "description": "Local ISP Gateway for high-speed media, live TV, OTT and FTP access.",
+    "status": "online"
+  },
+  {
+    "name": "DhakaFlix Media Gateway",
+    "url": "http://172.16.50.4/",
+    "category": "movies",
+    "tier": "lan",
+    "speed": "LAN 1 Gbps (Zero Buffer)",
+    "description": "Local ISP central entertainment portal for movies, series, games, software, and anime.",
+    "status": "online"
+  },
+  {
+    "name": "DhakaFlix-7 (Bangla & English Movies)",
+    "url": "http://172.16.50.7/DHAKA-FLIX-7/",
+    "category": "movies",
+    "tier": "lan",
+    "speed": "LAN 1 Gbps (Zero Buffer)",
+    "description": "English Movies, Kolkata Bangla Movies, Foreign Language & 3D Cinema directory.",
+    "status": "online"
+  },
+  {
+    "name": "DhakaFlix-14 (1080p Movies & South/Korean)",
+    "url": "http://172.16.50.14/DHAKA-FLIX-14/",
+    "category": "movies",
+    "tier": "lan",
+    "speed": "LAN 1 Gbps (Zero Buffer)",
+    "description": "Full HD 1080p English Movies, Hindi Cinema, South Indian Dubbed, Korean Series & IMDb Top 250.",
+    "status": "online"
+  },
+  {
+    "name": "DhakaFlix-12 (TV & Web Series)",
+    "url": "http://172.16.50.12/DHAKA-FLIX-12/",
+    "category": "movies",
+    "tier": "lan",
+    "speed": "LAN 1 Gbps (Zero Buffer)",
+    "description": "Complete TV & Web Series seasons, international shows, and Bengali drama archives.",
+    "status": "online"
+  },
+  {
+    "name": "DhakaFlix-10 (Anime, Cartoons & WWE)",
+    "url": "http://172.16.50.10/DHAKA-FLIX-10/",
+    "category": "ftp",
+    "tier": "lan",
+    "speed": "LAN 1 Gbps (Zero Buffer)",
+    "description": "Anime & Cartoon series, Documentaries, WWE & AEW Wrestling events, and tutorials.",
+    "status": "online"
+  },
+  {
+    "name": "DhakaFlix-8 (PC Games & Software)",
+    "url": "http://172.16.50.8/DHAKA-FLIX-8/",
+    "category": "ftp",
+    "tier": "lan",
+    "speed": "LAN 1 Gbps (Zero Buffer)",
+    "description": "Full PC Games (repack & ISOs), Android games, console ROMs, and PC utility software.",
+    "status": "online"
+  },
+  {
+    "name": "CircleFTP",
+    "url": "https://circleftp.net/",
+    "category": "ftp",
+    "tier": "bdix",
+    "speed": "BDIX High-Speed",
+    "description": "Bangladesh's premier BDIX FTP server with extensive library of movies, games, software, and series.",
+    "status": "online"
+  },
+  {
+    "name": "SunPlex Media Server",
+    "url": "https://sunplex.net/",
+    "category": "movies",
+    "tier": "bdix",
+    "speed": "BDIX High-Speed",
+    "description": "Fast streaming for latest Hollywood, Bollywood, South Indian movies, and popular TV shows.",
+    "status": "online"
+  },
+  {
+    "name": "FastPlex FTP Server",
+    "url": "https://fastplex.net/",
+    "category": "ftp",
+    "tier": "bdix",
+    "speed": "BDIX High-Speed",
+    "description": "Dedicated BDIX high-speed downloads for games, 4K/1080p movies, and software utilities.",
+    "status": "online"
+  },
+  {
+    "name": "MathaNosto FTP",
+    "url": "http://mathanosto.top/",
+    "category": "ftp",
+    "tier": "bdix",
+    "speed": "BDIX High-Speed",
+    "description": "One of the largest BDIX FTP directories with unlimited bandwidth downloads.",
+    "status": "online"
+  },
+  {
+    "name": "AmaderFTP",
+    "url": "http://amaderftp.net/",
+    "category": "ftp",
+    "tier": "bdix",
+    "speed": "BDIX High-Speed",
+    "description": "Community favorite FTP featuring Bengali cinema, Hindi dubbed movies, games, and music.",
+    "status": "online"
+  },
+  {
+    "name": "FlixHub Streaming",
+    "url": "https://flixhub.net/",
+    "category": "movies",
+    "tier": "bdix",
+    "speed": "BDIX High-Speed",
+    "description": "Modern streaming interface for top IMDb movies, TV series, and trending releases.",
+    "status": "online"
+  },
+  {
+    "name": "MovieBox BD",
+    "url": "http://movieboxbd.com/",
+    "category": "movies",
+    "tier": "bdix",
+    "speed": "BDIX High-Speed",
+    "description": "HD online movie playback and fast direct downloads over BDIX bandwidth.",
+    "status": "online"
+  },
+  {
+    "name": "MyMovieBazar",
+    "url": "https://mymoviebazar.net/",
+    "category": "movies",
+    "tier": "bdix",
+    "speed": "BDIX High-Speed",
+    "description": "BDIX movie portal featuring latest releases with multi-quality stream links.",
+    "status": "online"
+  },
+  {
+    "name": "MovieMaja",
+    "url": "http://moviemaja.net/",
+    "category": "movies",
+    "tier": "bdix",
+    "speed": "BDIX High-Speed",
+    "description": "Popular Bengali & South Indian movie collection with direct fast streaming.",
+    "status": "online"
+  },
+  {
+    "name": "PollyFlix",
+    "url": "http://pollyflix.com/",
+    "category": "movies",
+    "tier": "bdix",
+    "speed": "BDIX High-Speed",
+    "description": "BDIX connected web streaming server for movies and web series.",
+    "status": "online"
+  },
+  {
+    "name": "Dhaka Download",
+    "url": "http://www.dhakadownload.com/",
+    "category": "ftp",
+    "tier": "bdix",
+    "speed": "BDIX High-Speed",
+    "description": "Direct file downloads for PC games, ISOs, compressed software packages, and videos.",
+    "status": "online"
+  },
+  {
+    "name": "CineFlix BD",
+    "url": "http://cineflixbd.xyz/",
+    "category": "movies",
+    "tier": "bdix",
+    "speed": "BDIX High-Speed",
+    "description": "Fast video streaming portal for movies and shows over Bangladesh IX.",
+    "status": "online"
+  },
+  {
+    "name": "GeniousNet Downloads",
+    "url": "http://downloads.geniousnet.com/",
+    "category": "ftp",
+    "tier": "bdix",
+    "speed": "BDIX High-Speed",
+    "description": "GeniousNet BDIX download center with games, OS ISOs, and software archives.",
+    "status": "online"
+  },
+  {
+    "name": "BossBD Live",
+    "url": "http://bossbd.live/",
+    "category": "tv",
+    "tier": "bdix",
+    "speed": "BDIX High-Speed",
+    "description": "Live streaming portal and BDIX media gateway.",
+    "status": "online"
+  },
+  {
+    "name": "CTG Hub",
+    "url": "https://www.ctghub.com/",
+    "category": "movies",
+    "tier": "bdix",
+    "speed": "BDIX High-Speed",
+    "description": "Chittagong BDIX media hub with high speed streaming and file archives.",
+    "status": "online"
+  }
+]

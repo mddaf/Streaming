@@ -65,12 +65,17 @@ function buildProxyUrl(rawUrl, proxyIndex = null) {
  * Determine whether a given URL should go through the proxy based on routing mode and protocol
  */
 function shouldRouteThroughProxy(url, forceProxy = false) {
+    if (!url) return false;
     if (forceProxy || PROXY_CONFIG.currentMode === 'proxy') return true;
     if (PROXY_CONFIG.currentMode === 'direct') return false;
 
-    // In 'auto' mode:
-    // Most public IPTV streams lack CORS headers or are insecure HTTP.
-    // Routing through your Cloudflare Worker proxy by default guarantees CORS headers and zero playback errors.
+    // Private / Local ISP networks (172.16.x.x, 192.168.x.x, 10.x.x.x, localhost)
+    // cannot be reached by cloud proxies (Cloudflare Workers). Connect to them directly!
+    if (url.includes('172.16.') || url.includes('192.168.') || url.includes('10.') || url.includes('localhost') || url.includes('127.0.0.1')) {
+        return false;
+    }
+
+    // In 'auto' mode: route public streams through proxy
     return true;
 }
 

@@ -1,0 +1,618 @@
+[
+  {
+    "name": "Channel i",
+    "category": "Bangla",
+    "streamId": "159",
+    "logo": "http://172.16.15.5/assets/images/Channel i1664976520.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=159",
+    "streamUrl": "http://172.16.15.5:8666/159/index.m3u8?token=97136168725d59e1f254f183489759c97cb4abd0-6d6f0e8a23cfcce461ed4ed28c8ed0a5-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "Mohona TV",
+    "category": "Bangla",
+    "streamId": "157",
+    "logo": "http://172.16.15.5/assets/images/Mohona Tv1664825859.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=157",
+    "streamUrl": "http://172.16.15.5:8666/157/index.m3u8?token=97c4e4e03830d2d1a1e88f4b8fc3280b7cd70a4d-be68bbcd493f77039af512df98d85682-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "Channel 9",
+    "category": "Bangla",
+    "streamId": "160",
+    "logo": "http://172.16.15.5/assets/images/Channel 91664824936.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=160",
+    "streamUrl": "http://172.16.15.5:8666/160/index.m3u8?token=fd6acfded12bbfab2d8e765897ea338248b2d4fe-4b5ebbd7d5646a23fe7a2d4498704bed-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "SANGEET BANGLA",
+    "category": "Bangla",
+    "streamId": "101",
+    "logo": "http://172.16.15.5/assets/images/SANGEET BANGLA.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=101",
+    "streamUrl": "http://172.16.15.5:8666/101/index.m3u8?token=b1cd174164e8d4680997e5863ad47b51b7654851-64787629b3f6b195c21ee9eed92d2417-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "Ekushey TV",
+    "category": "Bangla",
+    "streamId": "172",
+    "logo": "http://172.16.15.5/assets/images/ekusheytv.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=172",
+    "streamUrl": "http://172.16.15.5:8666/172/index.m3u8?token=2e3dbb0c0c96d5e459bcd304a6dd4b628f987be9-83ab6d843ec9ed611c1d422fd2f58538-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "Ekattor TV",
+    "category": "Bangla",
+    "streamId": "156",
+    "logo": "http://172.16.15.5/assets/images/ekattortv.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=156",
+    "streamUrl": "http://172.16.15.5:8666/156/index.m3u8?token=9b54ecbdf797f473e38829cc598a87587fbb4f7a-c02f4995fb2cad350c07b8402e1412c1-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "Global TV",
+    "category": "Bangla",
+    "streamId": "142",
+    "logo": "http://172.16.15.5/assets/images/globaltv.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=142",
+    "streamUrl": "http://172.16.15.5:8666/142/index.m3u8?token=dd8bb7a24226bec74cdca021c8b33502fe96d6df-d6c62aff7e7ad1a5773be378e7026674-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "Somoy TV",
+    "category": "Bangla",
+    "streamId": "144",
+    "logo": "http://172.16.15.5/assets/images/SomoyTV1689411430.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=144",
+    "streamUrl": "http://172.16.15.5:8666/144/index.m3u8?token=ca30185576681aefa827aee85ef0c9aa1387551b-4d5ec58cceca383cc31e8d38936fae24-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "NTV",
+    "category": "Bangla",
+    "streamId": "173",
+    "logo": "http://172.16.15.5/assets/images/Ntv1664826430.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=173",
+    "streamUrl": "http://172.16.15.5:8666/173/index.m3u8?token=a6efefe5f4bb3a6199329ded2a48914bd9defe07-f9f44b7f89548942a44b4093069af76e-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "Maasranga",
+    "category": "Bangla",
+    "streamId": "182",
+    "logo": "http://172.16.15.5/assets/images/Masranga1667751530.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=182",
+    "streamUrl": "http://172.16.15.5:8666/182/index.m3u8?token=7fb479634741cdab3eb1353c543fed614fe6571f-754df5e9d846b88dc725b46ad6288867-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "Jamuna TV",
+    "category": "Bangla",
+    "streamId": "170",
+    "logo": "http://172.16.15.5/assets/images/Jamuna Tv1664825738.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=170",
+    "streamUrl": "http://172.16.15.5:8666/170/index.m3u8?token=aac2749d36c6d76929bd04a160b8c427706609e3-ce9abac18cb64655248df9fe1c7dc898-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "Star Jalsha",
+    "category": "Bangla",
+    "streamId": "165",
+    "logo": "http://172.16.15.5/assets/images/Star Jalsha1664976894.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=165",
+    "streamUrl": "http://172.16.15.5:8666/165/index.m3u8?token=b2b63d5f6a52fd53c2726b9dda19f3f61e039f00-e9f6c8cf768732c10c4437c3533b3efb-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "BTV World",
+    "category": "Bangla",
+    "streamId": "161",
+    "logo": "http://172.16.15.5/assets/images/btvworld.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=161",
+    "streamUrl": "http://172.16.15.5:8666/161/index.m3u8?token=d43918ecc1b5118c1231faa1b4f6732c5411e10f-005122293e1693a7b129a32ba99f78c1-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "Color Bangla Cinema",
+    "category": "Bangla",
+    "streamId": "149",
+    "logo": "http://172.16.15.5/assets/images/Color Bangla Cinema1664976765.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=149",
+    "streamUrl": "http://172.16.15.5:8666/149/index.m3u8?token=6ee911a15bfb3f2cc1d5ead6cf4f6063f3ec8e7d-df67c0f5656703f0cdbcb4ff89d28d6a-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "Nexus TV",
+    "category": "Bangla",
+    "streamId": "186",
+    "logo": "http://172.16.15.5/assets/images/nexustv.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=186",
+    "streamUrl": "http://172.16.15.5:8666/186/index.m3u8?token=baa406bb35dcd6b150a387c91747e22571ec6b65-365faa5cd9aee784a76dfc7bea1aaeef-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "Madani TV",
+    "category": "Bangla",
+    "streamId": "184",
+    "logo": "http://172.16.15.5/assets/images/Madani1664977182.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=184",
+    "streamUrl": "http://172.16.15.5:8666/184/index.m3u8?token=ead1930ed4f6e71d9760c0ec15a6963130237a26-0651b43c34af8fb0fa5ec6f8a745784e-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "Color Bangla HD",
+    "category": "Bangla",
+    "streamId": "102",
+    "logo": "http://172.16.15.5/assets/images/Colors Bangla1664976841.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=102",
+    "streamUrl": "http://172.16.15.5:8666/102/index.m3u8?token=493a24114770b403382075de88a41ee830044c39-52efe3cb6ac13dba2a80b1ecbe795333-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "SA TV",
+    "category": "Bangla",
+    "streamId": "162",
+    "logo": "http://172.16.15.5/assets/images/SA Tv1664826606.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=162",
+    "streamUrl": "http://172.16.15.5:8666/162/index.m3u8?token=0d8322f97c0440ce96baf9d044c87f354961f56a-2c3c17b304b0309de2b1a5d9b7884f51-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "Zee Bangla HD",
+    "category": "Bangla",
+    "streamId": "151",
+    "logo": "http://172.16.15.5/assets/images/Zee Bangla1664976875.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=151",
+    "streamUrl": "http://172.16.15.5:8666/151/index.m3u8?token=53a36e77740e4ffb371633c484a6a8a9223a26be-8bc00abb2cfddfaf3a605571dc2cf626-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "Enterr 10 Bangla",
+    "category": "Bangla",
+    "streamId": "175",
+    "logo": "http://172.16.15.5/assets/images/entertain.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=175",
+    "streamUrl": "http://172.16.15.5:8666/175/index.m3u8?token=4390768c17594abdc953aaf3b1860ce3b095dffb-6fe11c92c3062a07dcb1d98ed9d42ee3-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "Deepto TV",
+    "category": "Bangla",
+    "streamId": "176",
+    "logo": "http://172.16.15.5/assets/images/deeptotvhd.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=176",
+    "streamUrl": "http://172.16.15.5:8666/176/index.m3u8?token=2d47906eed7637062dbbfa039922b321351df558-52b6825cbad936bd646a571365ce51da-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "RTV HD",
+    "category": "Bangla",
+    "streamId": "141",
+    "logo": "http://172.16.15.5/assets/images/rtv.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=141",
+    "streamUrl": "http://172.16.15.5:8666/141/index.m3u8?token=d9890ef4a4aacb8e06d8a1d4cfd36090f823007f-0beea829917e742e176cf2863bc467f9-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "ATN NEWS",
+    "category": "Bangla",
+    "streamId": "164",
+    "logo": "http://172.16.15.5/assets/images/ATN BANGLA NEWS.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=164",
+    "streamUrl": "http://172.16.15.5:8666/164/index.m3u8?token=098e898eaf4cc0e4e34dbdac822243d948872560-49b2ed0109be706a024d28f69c13daae-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "G Series",
+    "category": "Bangla",
+    "streamId": "178",
+    "logo": "http://172.16.15.5/assets/images/GSeries.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=178",
+    "streamUrl": "http://172.16.15.5:8666/178/index.m3u8?token=c483832f1dc8494f4d3e0f622a385aab2004a5aa-ac987a15949ab00e9204833744de35d0-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "Banglavision",
+    "category": "Bangla",
+    "streamId": "179",
+    "logo": "http://172.16.15.5/assets/images/banglavision.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=179",
+    "streamUrl": "http://172.16.15.5:8666/179/index.m3u8?token=0fc497916541b50121a66d8a8e9aab59f3cc1b52-4c1bbaac448d125def762ea4898e5f8d-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "Bijoy TV",
+    "category": "Bangla",
+    "streamId": "180",
+    "logo": "http://172.16.15.5/assets/images/Bijoy1664824527.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=180",
+    "streamUrl": "http://172.16.15.5:8666/180/index.m3u8?token=354c11bbf2bdcdca2a552c733bfef9d37425bbbe-6094ef35913d847d0e5e0eab42a3a6c0-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "Boishakhi TV",
+    "category": "Bangla",
+    "streamId": "181",
+    "logo": "http://172.16.15.5/assets/images/Boishakhi_Tv.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=181",
+    "streamUrl": "http://172.16.15.5:8666/181/index.m3u8?token=eedff86c61fc9bfbc2c112a85bb9344d5ab9eba8-e764451580f1898baf4747184855a3e2-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "Jalsha Movies",
+    "category": "Bangla",
+    "streamId": "196",
+    "logo": "http://172.16.15.5/assets/images/Jalsha Movies1664976818.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=196",
+    "streamUrl": "http://172.16.15.5:8666/196/index.m3u8?token=9a4eb7f43138e90db40e4df6a460e89cb3b4bbb5-95b750d4e18598c5ce09af0a8b2163ae-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "TSports",
+    "category": "Sports",
+    "streamId": "T-SPORTS",
+    "logo": "http://172.16.15.5/assets/images/TSports%2021668953490.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=T-SPORTS",
+    "streamUrl": "http://172.16.15.5:8666/T-SPORTS/index.m3u8?token=6714f6913f743ab29669fcd55dfa87c3770f573f-b4ed7468b5b4d6193d3f44e0b21f7ee0-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "A Sports HD",
+    "category": "Sports",
+    "streamId": "167",
+    "logo": "http://172.16.15.5/assets/images/A Sports HD.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=167",
+    "streamUrl": "http://172.16.15.5:8666/167/index.m3u8?token=2a0710b2df892cb4bbecd8ec2a8b530d84fcf1ce-66bf00e479127cf8425711806e320b1d-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "Bein Sports Extra",
+    "category": "Sports",
+    "streamId": "177",
+    "logo": "http://172.16.15.5/assets/images/bein-sports-extra.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=177",
+    "streamUrl": "http://172.16.15.5:8666/177/index.m3u8?token=634bfc1597a5f8be3d846d1ec774902b4b85e479-aebd02c3c66620dc2774d1621cb2cb6e-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "Sony TEN 1",
+    "category": "Sports",
+    "streamId": "188",
+    "logo": "http://172.16.15.5/assets/images/Sony TEN 11667728321.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=188",
+    "streamUrl": "http://172.16.15.5:8666/188/index.m3u8?token=ee07a0d1da8c429936ffa4c80eaa7b5e96117cfb-7afea9eb05b8958bc98c0c55e1a4a435-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "Sony TEN 2",
+    "category": "Sports",
+    "streamId": "189",
+    "logo": "http://172.16.15.5/assets/images/Sony TEN 21667728105.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=189",
+    "streamUrl": "http://172.16.15.5:8666/189/index.m3u8?token=fc650eed9c99e0ac2e14cfd0f7fceb7a22e927b7-5ab4cd3725d7f79660627f5cd57d6980-1791404501-1791393701&remote=103.55.145.165"
+  },
+  {
+    "name": "Sony TEN 4",
+    "category": "Sports",
+    "streamId": "109",
+    "logo": "http://172.16.15.5/assets/images/ten4.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=109",
+    "streamUrl": "http://172.16.15.5:8666/109/index.m3u8?token=6e7223764d5ef945aebf65c644e6720b7a849e83-7dfb6a738b853bac34fb89674f4753da-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "Sony TEN 3",
+    "category": "Sports",
+    "streamId": "115",
+    "logo": "http://172.16.15.5/assets/images/Sony TEN 31667728117.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=115",
+    "streamUrl": "http://172.16.15.5:8666/115/index.m3u8?token=b2b63e6455dea738456ed2fa05c79ba381712c98-5c3df3883caaed3120631fc9dce20de2-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "Sony TEN 5",
+    "category": "Sports",
+    "streamId": "190",
+    "logo": "http://172.16.15.5/assets/images/Sony TEN 51667728306.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=190",
+    "streamUrl": "http://172.16.15.5:8666/190/index.m3u8?token=217556eda590f4421f9eae5f590592bc5108a6c4-2630030432ebb49e8aa4d16e79e41102-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "Star Sports 1",
+    "category": "Sports",
+    "streamId": "104",
+    "logo": "http://172.16.15.5/assets/images/Star Sports 11667750523.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=104",
+    "streamUrl": "http://172.16.15.5:8666/104/index.m3u8?token=d2aa27a026452b74899c406bc1adc5126d9486ed-ddd0290aaa4d924468170b87982c2a14-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "Star Sports 2",
+    "category": "Sports",
+    "streamId": "166",
+    "logo": "http://172.16.15.5/assets/images/Star Sports 21667750538.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=166",
+    "streamUrl": "http://172.16.15.5:8666/166/index.m3u8?token=6e9d06c84a685cc0f7e5337b980e82f53049a27d-6538e55e24965ec758a5994cf3c6d98e-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "Star Sports 3",
+    "category": "Sports",
+    "streamId": "112",
+    "logo": "http://172.16.15.5/assets/images/starsports3.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=112",
+    "streamUrl": "http://172.16.15.5:8666/112/index.m3u8?token=6314b5f281c9beb88d0fb69e4e215e0e034f60bf-24e7d19877935ce1cfe9a5bbd8bdd168-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "StarSports Select HD",
+    "category": "Sports",
+    "streamId": "101",
+    "logo": "http://172.16.15.5/assets/images/StarSports Select HD1667750883.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=101",
+    "streamUrl": "http://172.16.15.5:8666/101/index.m3u8?token=449e00098ccefc9aa60b030693a18f58a0c49d21-6cdfcc18999096b16c4a4d78b19fbb70-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "Star Sports Select 2",
+    "category": "Sports",
+    "streamId": "103",
+    "logo": "http://172.16.15.5/assets/images/Star Sports Select 21667750897.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=103",
+    "streamUrl": "http://172.16.15.5:8666/103/index.m3u8?token=18fe76ee871853d329fd26afe5f30d8d87408977-a2df74906518adf83ef224017ae7cc33-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "Eurosports",
+    "category": "Sports",
+    "streamId": "107",
+    "logo": "http://172.16.15.5/assets/images/eurosports.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=107",
+    "streamUrl": "http://172.16.15.5:8666/107/index.m3u8?token=196d7680f69d5bee89a5a025e1c8f68091260189-6e25bce20c5aec2dbd570e1667197686-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "MTV Beats",
+    "category": "Hindi",
+    "streamId": "183",
+    "logo": "http://172.16.15.5/assets/images/mtvbeats.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=183",
+    "streamUrl": "http://172.16.15.5:8666/183/index.m3u8?token=3ff5086e1cea380eb173af877c5b1e11cdc61b68-ec3c0e41f7692bce6abfe329b04ecc5a-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "HUM TV",
+    "category": "Hindi",
+    "streamId": "103",
+    "logo": "http://172.16.15.5/assets/images/HUM-TV.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=103",
+    "streamUrl": "http://172.16.15.5:8666/103/index.m3u8?token=d204201ce0f845faba5b8180bfcc1481ff60a11c-c989666e112d5e8758dbf7ba4ec31263-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "Star Plus",
+    "category": "Hindi",
+    "streamId": "122",
+    "logo": "http://172.16.15.5/assets/images/Star Plus1667751169.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=122",
+    "streamUrl": "http://172.16.15.5:8666/122/index.m3u8?token=0cc06743e009a372db8ca1c99fdb7c139b546afa-b50f8032f04f4b8e9f3f88237cfedf4c-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "Sony SAB",
+    "category": "Hindi",
+    "streamId": "194",
+    "logo": "http://172.16.15.5/assets/images/Sony SAB1681564997.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=194",
+    "streamUrl": "http://172.16.15.5:8666/194/index.m3u8?token=32d56c9e55bb7a41d61118b5d3820d49f51d681b-828e216bdb41a2a5cae8393ea646afb9-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "Sony Max HD",
+    "category": "Hindi",
+    "streamId": "192",
+    "logo": "http://172.16.15.5/assets/images/Sony Max HD1667728133.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=192",
+    "streamUrl": "http://172.16.15.5:8666/192/index.m3u8?token=8b56c743f04a4dcabe44f7b9b8f52f4686f9f5c1-da203770fc39c7a179df5e8308e61c41-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "9XM",
+    "category": "Hindi",
+    "streamId": "174",
+    "logo": "http://172.16.15.5/assets/images/9XM1664974682.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=174",
+    "streamUrl": "http://172.16.15.5:8666/174/index.m3u8?token=8e38a3219155b005eb1fe87adae15315fbf8e42c-a0f50a4c776c469621a44e5ead1bef20-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "SONY MAX 2",
+    "category": "Hindi",
+    "streamId": "104",
+    "logo": "http://172.16.15.5/assets/images/SONY MAX 2.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=104",
+    "streamUrl": "http://172.16.15.5:8666/104/index.m3u8?token=2eb9c89bc36a8412e0936aec0b360cd74f7b09dd-d264bbb044537ee346f551ce05751329-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "B4U",
+    "category": "Hindi",
+    "streamId": "105",
+    "logo": "http://172.16.15.5/assets/images/B4U.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=105",
+    "streamUrl": "http://172.16.15.5:8666/105/index.m3u8?token=fe8ec46ac40444692c52752101493e4a873b8119-a9b4931a0d5cab5c60e69cfb644dbbc3-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "Sony Entertainment",
+    "category": "Hindi",
+    "streamId": "193",
+    "logo": "http://172.16.15.5/assets/images/Sony Entertainment1667728144.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=193",
+    "streamUrl": "http://172.16.15.5:8666/193/index.m3u8?token=a4082a31480f0b5cad7b8ca2aef5d13321b89f1a-9883fd889f7897f27a61f3b801e81be4-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "B4U Music",
+    "category": "Hindi",
+    "streamId": "106",
+    "logo": "http://172.16.15.5/assets/images/B4U Music.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=106",
+    "streamUrl": "http://172.16.15.5:8666/106/index.m3u8?token=ba152ba4b77b6124ca22dda635e9ae1e9c02dc4e-70e8c5b5027434dea0916b47c6fb92c7-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "PTC MUSIC",
+    "category": "Hindi",
+    "streamId": "119",
+    "logo": "http://172.16.15.5/assets/images/PTC MUSIC.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=119",
+    "streamUrl": "http://172.16.15.5:8666/119/index.m3u8?token=dd9c1c48132197e1fed90df30a328260a76f9a96-848ddae14e0d327c9bc6308f4108d51e-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "MN Plus",
+    "category": "English",
+    "streamId": "135",
+    "logo": "http://172.16.15.5/assets/images/MN Plus1664974912.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=135",
+    "streamUrl": "http://172.16.15.5:8666/135/index.m3u8?token=28985319660521208a8b80420e384f5b460c551b-496b5c441630582e573dd4b3e5d4a8a8-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "Color Cineplex",
+    "category": "Hindi",
+    "streamId": "121",
+    "logo": "http://172.16.15.5/assets/images/Color Cineplex1664974156.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=121",
+    "streamUrl": "http://172.16.15.5:8666/121/index.m3u8?token=453741dc53e079bf07d6240fedd1640db1607525-3737521a946095a3df46a9f6804930f4-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "Star Movies",
+    "category": "English",
+    "streamId": "131",
+    "logo": "http://172.16.15.5/assets/images/Star Movies1667751377.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=131",
+    "streamUrl": "http://172.16.15.5:8666/131/index.m3u8?token=9a2a68051dda5ca7f6c3131f9d4c87d66a9b79a5-6c1bfd3da0183d917a024db63f66a90d-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "Romedy Now",
+    "category": "English",
+    "streamId": "125",
+    "logo": "http://172.16.15.5/assets/images/Romedy Now1689427170.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=125",
+    "streamUrl": "http://172.16.15.5:8666/125/index.m3u8?token=e10250d8b408a88bdc241e18c6851baab041ac94-1660fb369c3e2905f067beb06f1f3ff6-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "Sony Pix HD",
+    "category": "English",
+    "streamId": "123",
+    "logo": "http://172.16.15.5/assets/images/Sony Pix HD1667728093.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=123",
+    "streamUrl": "http://172.16.15.5:8666/123/index.m3u8?token=b246d95dea3bcefd60432a0642dbd26386c02852-21708e60fbb7b09decfb703c798ff634-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "Zee Cafe HD",
+    "category": "English",
+    "streamId": "137",
+    "logo": "http://172.16.15.5/assets/images/zeecafehd.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=137",
+    "streamUrl": "http://172.16.15.5:8666/137/index.m3u8?token=790d1335624025a020de71aa5a3e062367d1e776-5aabe811db8fbdb01f8502e1adee21b6-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "Star Movie Select",
+    "category": "English",
+    "streamId": "146",
+    "logo": "http://172.16.15.5/assets/images/starmovieselect.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=146",
+    "streamUrl": "http://172.16.15.5:8666/146/index.m3u8?token=b57682dcb0bcdd427cd943e3d00a16b475257a14-7977006e402da2e16520db32ef917c90-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "Sony Movie",
+    "category": "English",
+    "streamId": "191",
+    "logo": "http://172.16.15.5/assets/images/Sony_Movies .png",
+    "playUrl": "http://172.16.15.5/play.php?stream=191",
+    "streamUrl": "http://172.16.15.5:8666/191/index.m3u8?token=226815d85c811d739a5c8e018fdc63431818b440-d89efeb78a74275a857784c5dfbdcba5-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "MNX",
+    "category": "English",
+    "streamId": "127",
+    "logo": "http://172.16.15.5/assets/images/MNX1664975330.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=127",
+    "streamUrl": "http://172.16.15.5:8666/127/index.m3u8?token=3e540d1da7ffc1203cb03d645925c55a8ba4d513-fd974c5edfc6afbb046e3458e60aef02-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "AndFlix HD",
+    "category": "English",
+    "streamId": "143",
+    "logo": "http://172.16.15.5/assets/images/andflixhd.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=143",
+    "streamUrl": "http://172.16.15.5:8666/143/index.m3u8?token=ee65d9f009a0fc34f8356e75c0d08c01ad110e03-10111aa62a3ebbdf53183ceca18a7afc-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "Colors Infinity",
+    "category": "English",
+    "streamId": "121",
+    "logo": "http://172.16.15.5/assets/images/colorsinfinity.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=121",
+    "streamUrl": "http://172.16.15.5:8666/121/index.m3u8?token=2a3f06a146a1f02fec841c20d3576aa73015c29f-e377956e0ebd69529aa8067478ec66e1-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "Animal Planet",
+    "category": "English",
+    "streamId": "163",
+    "logo": "http://172.16.15.5/assets/images/Animal Planet.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=163",
+    "streamUrl": "http://172.16.15.5:8666/163/index.m3u8?token=a52daa2490b5031073eb41b67e12076c1dc95096-155d35fb3afa20b3183649d431d5433e-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "Sony Yay",
+    "category": "Kids",
+    "streamId": "195",
+    "logo": "http://172.16.15.5/assets/images/sonyyay.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=195",
+    "streamUrl": "http://172.16.15.5:8666/195/index.m3u8?token=cbad559b52215d586f60627dcc420c5590aad3c3-f0d68d252fa482b653ab285997143227-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "Pogo",
+    "category": "Kids",
+    "streamId": "185",
+    "logo": "http://172.16.15.5/assets/images/Pogo HD.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=185",
+    "streamUrl": "http://172.16.15.5:8666/185/index.m3u8?token=f88f5cd75b7ef8399ae0268703bbb7ac417777c0-34f42ca32126c5a2de45dd1ecc426b6a-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "Nick",
+    "category": "Kids",
+    "streamId": "198",
+    "logo": "http://172.16.15.5/assets/images/Nick HD1664976992.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=198",
+    "streamUrl": "http://172.16.15.5:8666/198/index.m3u8?token=483fda126b7a91de2d920b6134c42a807f9afead-e6d796ff91af8d130cce1da38a8ea21a-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "Sony Aath",
+    "category": "Kids",
+    "streamId": "145",
+    "logo": "http://172.16.15.5/assets/images/Sony Aath1667728032.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=145",
+    "streamUrl": "http://172.16.15.5:8666/145/index.m3u8?token=5990aa01ab1f1a5793906bc6073eea59f4f37206-7890782ca27356531e7b34211321363d-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "Cartoon Network",
+    "category": "Kids",
+    "streamId": "124",
+    "logo": "http://172.16.15.5/assets/images/cn.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=124",
+    "streamUrl": "http://172.16.15.5:8666/124/index.m3u8?token=22d43dce9b3021e050da4b23e3e9425ee4fe9b27-825c7134e8aba2fca81550537d99117b-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "Sonic",
+    "category": "Kids",
+    "streamId": "199",
+    "logo": "http://172.16.15.5/assets/images/SONIC.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=199",
+    "streamUrl": "http://172.16.15.5:8666/199/index.m3u8?token=bff2f3d9dc29eb2add1f469e2ba1991e319328eb-d645eb9b4c75cf972a060b74d57abc7c-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "Duronto",
+    "category": "Kids",
+    "streamId": "197",
+    "logo": "http://172.16.15.5/assets/images/Duronto1665400494.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=197",
+    "streamUrl": "http://172.16.15.5:8666/197/index.m3u8?token=a53fdff9debc6de65e8b295b0c96d85519eb44f7-0fd1a09e98280f5d30563f6bb46f292e-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "Discovery",
+    "category": "Others",
+    "streamId": "113",
+    "logo": "http://172.16.15.5/assets/images/Discovery1664975007.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=113",
+    "streamUrl": "http://172.16.15.5:8666/113/index.m3u8?token=b6153681dedadcbd2e8aa06a9471f75586153a75-410923ab15877ec391bdbf33a191d38d-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "Travel XP",
+    "category": "Others",
+    "streamId": "120",
+    "logo": "http://172.16.15.5/assets/images/Travel XP1664976451.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=120",
+    "streamUrl": "http://172.16.15.5:8666/120/index.m3u8?token=7094e7c5a9718c03d9076d5e0840acefa62e14a9-1cf3914a4e26b796a190b0850ed33934-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "National Geography",
+    "category": "Others",
+    "streamId": "169",
+    "logo": "http://172.16.15.5/assets/images/National Geography Wild1664975242.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=169",
+    "streamUrl": "http://172.16.15.5:8666/169/index.m3u8?token=4dbeddaf06450013bd4c614827b78b531965a6ca-70d4a5c5ed9e05eb271857512c67a03a-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "NatureTime",
+    "category": "Others",
+    "streamId": "108",
+    "logo": "http://172.16.15.5/assets/images/NatureTime.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=108",
+    "streamUrl": "http://172.16.15.5:8666/108/index.m3u8?token=b29cfedf5bdf0dc50601a6a0672488b1c35f829e-5417b40850aaa6851599f293547132ec-1791404502-1791393702&remote=103.55.145.165"
+  },
+  {
+    "name": "BBC Earth",
+    "category": "Others",
+    "streamId": "117",
+    "logo": "http://172.16.15.5/assets/images/BBC Earth1664974852.png",
+    "playUrl": "http://172.16.15.5/play.php?stream=117",
+    "streamUrl": "http://172.16.15.5:8666/117/index.m3u8?token=e4e6f58bc80660d8ee36a21e15a33e3087a8c339-3d242a78105176778bfb7e63871f9d95-1791404502-1791393702&remote=103.55.145.165"
+  }
+]
