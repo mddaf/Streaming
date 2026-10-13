@@ -745,6 +745,11 @@
         } else if (status === 'local') {
             statusBadgeHtml = `<span class="card-status-badge status-badge-local" title="Local/LAN stream — open directly on your network">⚡ LAN</span>`;
         }
+        // Always emit an (empty, CSS-hidden) placeholder so the async health-check
+        // callback can fill the badge later — channels checked AFTER render had no
+        // element to populate, so only pre-cached (e.g. previously-watched) ones
+        // showed a badge.
+        if (!statusBadgeHtml) statusBadgeHtml = `<span class="card-status-badge"></span>`;
 
         // Server options overlay in the IMAGE AREA (when multiple servers exist)
         let serverOverlayHtml = '';
@@ -838,6 +843,8 @@
         } else if (status === 'local') {
             statusBadgeHtml = `<span class="badge-pill badge-health-local" title="Local/LAN stream — open directly">⚡ LAN</span>`;
         }
+        // Empty placeholder so the async health-check callback can fill it later.
+        if (!statusBadgeHtml) statusBadgeHtml = `<span class="badge-pill"></span>`;
 
         const logoUrl = channel.logo || '';
         const fallbackMonogram = channel.name.slice(0, 2).toUpperCase();

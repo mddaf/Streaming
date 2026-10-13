@@ -429,6 +429,8 @@ img { display: block; max-width: 100%; }
 .status-badge-geo, .badge-health-geo { color: var(--accent-amber); background: rgba(227,165,58,0.15); border: 1px solid rgba(227,165,58,0.3); }
 .status-badge-checking { color: var(--text-accent); background: rgba(46,125,255,0.15); border: 1px solid rgba(46,125,255,0.3); }
 .status-badge-local, .badge-health-local { color: #2bd4c4; background: rgba(43,212,196,0.15); border: 1px solid rgba(43,212,196,0.32); }
+/* empty status placeholders stay invisible until the health check fills them */
+.card-status-badge:empty, .badge-pill:empty { display: none; }
 .status-offline { opacity: 0.5; }
 
 /* ----------------------------------------------------- loading / empty */
