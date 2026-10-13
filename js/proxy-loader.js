@@ -26,6 +26,21 @@ const PROXY_CONFIG = {
     streamHeaders: null
 };
 
+// Restore a user-saved custom/regional proxy (used to bypass true IP-geo blocks:
+// point it at a header-capable proxy — another Cloudflare Worker or a VPS in the
+// required country — that accepts ?ref=&origin=&ua=&url=, same as the primary).
+try { const cp = localStorage.getItem('sp_custom_proxy'); if (cp) PROXY_CONFIG.customProxy = cp; } catch (e) {}
+
+// Save/clear that custom proxy (persists across sessions)
+function setCustomProxy(url) {
+    PROXY_CONFIG.customProxy = (url || '').trim();
+    try {
+        if (PROXY_CONFIG.customProxy) localStorage.setItem('sp_custom_proxy', PROXY_CONFIG.customProxy);
+        else localStorage.removeItem('sp_custom_proxy');
+    } catch (e) {}
+    return PROXY_CONFIG.customProxy;
+}
+
 // Set/clear the header overrides for the next stream (call before loading a channel)
 function setStreamHeaders(headers) {
     PROXY_CONFIG.streamHeaders = headers && (headers.referer || headers.origin || headers.userAgent)
@@ -75,7 +90,9 @@ function buildProxyUrl(rawUrl, proxyIndex = null, headers = null) {
 
     if (idx === 3 && PROXY_CONFIG.customProxy) {
         const base = PROXY_CONFIG.customProxy.endsWith('?') ? PROXY_CONFIG.customProxy : (PROXY_CONFIG.customProxy + '?');
-        return base + encodeURIComponent(clean);
+        // Custom/regional proxy is treated as worker-style: pass Referer/UA too.
+        const hqs = buildHeaderQS(headers);
+        return hqs ? base + hqs + 'url=' + encodeURIComponent(clean) : base + encodeURIComponent(clean);
     } else if (idx === 1) {
         return PROXY_CONFIG.fallbacks[0] + encodeURIComponent(clean);
     } else if (idx === 2) {
@@ -210,6 +227,7 @@ async function fetchCatalog() {
 window.SmartProxyEngine = {
     CONFIG: PROXY_CONFIG,
     setStreamHeaders,
+    setCustomProxy,
     resolveStream,
     fetchCatalog,
     unwrapProxyUrl,

@@ -996,6 +996,12 @@
         state.currentChannel = channel;
         state.currentServerIndex = serverIndex;
 
+        // On a fresh open, start from the proxy that worked for this channel last time
+        if (!forceProxy && proxyIndex === 0 && channel && channel._proxyIndex) {
+            proxyIndex = channel._proxyIndex;
+            forceProxy = proxyIndex !== 0;
+        }
+
         // Hide geo-alert
         if (elements.geoAlertBanner) elements.geoAlertBanner.style.display = 'none';
 
@@ -1126,6 +1132,7 @@
 
             hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
                 elements.currentChannelStatus.innerHTML = '<span class="live-pulse-dot"></span> Stream Live';
+                if (channel) channel._proxyIndex = proxyIndex; // remember the route that worked
                 elements.video.play().catch(() => {
                     console.log('Autoplay blocked by browser; user interaction required');
                 });
@@ -1179,9 +1186,21 @@
                         return;
                     }
 
-                    // Step 2: Primary proxy failed -> Try Alternate Global Proxy (only if not dead link)
+                    // Auto-failover across every proxy before giving up (not just one).
+                    const CFG = window.SmartProxyEngine ? window.SmartProxyEngine.CONFIG : {};
+                    // Step 2: primary worker(0) failed -> your custom/regional proxy(3) if set, else global(1)
                     if (needProxy && proxyIndex === 0 && !isDeadLink) {
+                        playChannel(channel, serverIndex, true, CFG.customProxy ? 3 : 1);
+                        return;
+                    }
+                    // Step 2b: custom/regional proxy(3) failed -> global CORS proxy(1)
+                    if (needProxy && proxyIndex === 3 && !isDeadLink) {
                         playChannel(channel, serverIndex, true, 1);
+                        return;
+                    }
+                    // Step 2c: global proxy(1) failed -> secondary global proxy(2)
+                    if (needProxy && proxyIndex === 1 && !isDeadLink) {
+                        playChannel(channel, serverIndex, true, 2);
                         return;
                     }
 
@@ -1265,6 +1284,7 @@
             description = 'Could not load this stream. Try an alternate server or reload.';
         }
 
+        const CFG = window.SmartProxyEngine ? window.SmartProxyEngine.CONFIG : {};
         elements.geoAlertBanner.style.display = 'block';
         elements.geoAlertBanner.innerHTML = `
             <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
@@ -1281,6 +1301,11 @@
                     <button type="button" class="action-btn" id="geo-btn-reload">🔃 Reload</button>
                     <button type="button" class="action-btn" id="geo-btn-guide">ℹ️ Geo-Tips</button>
                 </div>
+                ${errorType === 'geo' ? `
+                <div style="display:flex;gap:6px;width:100%;margin-top:2px;">
+                    <input type="url" id="geo-proxy-input" class="search-input" placeholder="Header-capable proxy in the right region (worker/VPS that accepts ?ref=&ua=&url=)" style="flex:1;padding:6px 10px;font-size:0.75rem;" value="${CFG.customProxy || ''}">
+                    <button type="button" class="action-btn" id="geo-btn-save-proxy" style="background:var(--accent-emerald);color:#000;font-weight:700;white-space:nowrap;">🌍 Save &amp; Retry</button>
+                </div>` : ''}
             </div>
         `;
 
@@ -1297,6 +1322,17 @@
         if (altProxyBtn) {
             altProxyBtn.onclick = () => {
                 playChannel(channel, state.currentServerIndex, true, 1);
+            };
+        }
+
+        // Save a header-capable regional proxy and retry the geo-locked stream through it
+        const saveProxyBtn = document.getElementById('geo-btn-save-proxy');
+        if (saveProxyBtn) {
+            saveProxyBtn.onclick = () => {
+                const v = (document.getElementById('geo-proxy-input').value || '').trim();
+                if (window.SmartProxyEngine) window.SmartProxyEngine.setCustomProxy(v);
+                elements.geoAlertBanner.style.display = 'none';
+                if (v) playChannel(channel, state.currentServerIndex, true, 3);
             };
         }
 
