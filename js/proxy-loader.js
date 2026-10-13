@@ -33,8 +33,8 @@ function setStreamHeaders(headers) {
 }
 
 // Build the ref/origin/ua querystring prefix for the Worker (ends with '&' when non-empty)
-function buildHeaderQS() {
-    const h = PROXY_CONFIG.streamHeaders;
+function buildHeaderQS(headers) {
+    const h = headers || PROXY_CONFIG.streamHeaders;
     if (!h) return '';
     let qs = '';
     if (h.referer) qs += 'ref=' + encodeURIComponent(h.referer) + '&';
@@ -69,7 +69,7 @@ function unwrapProxyUrl(url) {
 /**
  * Build a proxy URL for a target URL using specified or active proxy index
  */
-function buildProxyUrl(rawUrl, proxyIndex = null) {
+function buildProxyUrl(rawUrl, proxyIndex = null, headers = null) {
     const clean = unwrapProxyUrl(rawUrl);
     const idx = proxyIndex !== null ? proxyIndex : PROXY_CONFIG.activeProxyIndex;
 
@@ -82,7 +82,8 @@ function buildProxyUrl(rawUrl, proxyIndex = null) {
         return PROXY_CONFIG.fallbacks[1] + encodeURIComponent(clean);
     } else {
         // Primary Worker: attach per-stream header overrides via url= form when present
-        const hqs = buildHeaderQS();
+        // (explicit `headers` arg wins — used by the health-checker per channel)
+        const hqs = buildHeaderQS(headers);
         return hqs ? PROXY_CONFIG.primary + hqs + 'url=' + encodeURIComponent(clean)
                    : PROXY_CONFIG.primary + encodeURIComponent(clean);
     }

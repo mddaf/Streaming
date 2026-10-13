@@ -368,6 +368,8 @@ img { display: block; max-width: 100%; }
     position: relative; display: flex; flex-direction: column; gap: 9px; padding: 11px;
     background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
     cursor: pointer; transition: transform var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+    /* browser skips rendering off-screen cards, so deep scrolling stays smooth */
+    content-visibility: auto; contain-intrinsic-size: auto 188px;
 }
 .channel-card:hover { background: var(--bg-card-hover); border-color: var(--border-medium); transform: translateY(-2px); }
 .channel-card.active-playing { border-color: var(--accent-blue); box-shadow: var(--glow-cyan); }
@@ -411,6 +413,7 @@ img { display: block; max-width: 100%; }
     display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 12px;
     background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
     cursor: pointer; transition: background var(--transition-fast), border-color var(--transition-fast);
+    content-visibility: auto; contain-intrinsic-size: auto 56px;
 }
 .channel-list-item:hover { background: var(--bg-card-hover); border-color: var(--border-medium); }
 .channel-list-item.active-playing { border-color: var(--accent-blue); background: rgba(46,125,255,0.08); }
@@ -425,6 +428,7 @@ img { display: block; max-width: 100%; }
 .status-badge-dead, .badge-health-dead { color: var(--text-muted); background: rgba(103,117,138,0.15); border: 1px solid rgba(103,117,138,0.3); }
 .status-badge-geo, .badge-health-geo { color: var(--accent-amber); background: rgba(227,165,58,0.15); border: 1px solid rgba(227,165,58,0.3); }
 .status-badge-checking { color: var(--text-accent); background: rgba(46,125,255,0.15); border: 1px solid rgba(46,125,255,0.3); }
+.status-badge-local, .badge-health-local { color: #2bd4c4; background: rgba(43,212,196,0.15); border: 1px solid rgba(43,212,196,0.32); }
 .status-offline { opacity: 0.5; }
 
 /* ----------------------------------------------------- loading / empty */

@@ -651,9 +651,11 @@
         elements.statsBadge.innerHTML = `Showing <b>${state.displayedChannels.length}</b> channels &bull; <span style="color:var(--accent-emerald)">${onlineCount} Online</span> &bull; <span style="color:var(--accent-rose)">${offlineCount} Offline</span>`;
     }
 
+    let channelScrollObserver = null;
     function renderChannels() {
         const container = elements.channelsContainer;
         container.innerHTML = '';
+        if (channelScrollObserver) { channelScrollObserver.disconnect(); channelScrollObserver = null; }
 
         if (state.displayedChannels.length === 0) {
             container.innerHTML = `
@@ -668,13 +670,46 @@
         const isGrid = state.viewMode === 'grid';
         const wrapper = document.createElement('div');
         wrapper.className = isGrid ? 'channels-grid' : 'channels-list-view';
-
-        state.displayedChannels.forEach(channel => {
-            const card = isGrid ? createChannelCard(channel) : createChannelListItem(channel);
-            wrapper.appendChild(card);
-        });
-
         container.appendChild(wrapper);
+
+        // Virtualized render: keep only a window of cards in the DOM and append more
+        // as the user scrolls. Rendering all displayed channels at once (7000+ cards,
+        // each with an image/badges/buttons) froze scrolling and clicks.
+        const CHUNK = 60;
+        let cursor = 0;
+
+        const sentinel = document.createElement('div');
+        sentinel.style.cssText = 'height:1px;width:100%;';
+        container.appendChild(sentinel);
+
+        function appendChunk() {
+            const slice = state.displayedChannels.slice(cursor, cursor + CHUNK);
+            const frag = document.createDocumentFragment();
+            slice.forEach(channel => {
+                frag.appendChild(isGrid ? createChannelCard(channel) : createChannelListItem(channel));
+            });
+            wrapper.appendChild(frag);
+            cursor += slice.length;
+            // Health-check only the rows we actually rendered, so their Live/Offline
+            // badges populate and the Hide-Offline filter has real statuses to act on.
+            if (window.streamHealthChecker) window.streamHealthChecker.queueBatch(slice, slice.length);
+            if (cursor >= state.displayedChannels.length && channelScrollObserver) {
+                channelScrollObserver.disconnect();
+                channelScrollObserver = null;
+                sentinel.remove();
+            }
+        }
+
+        appendChunk(); // first visible window
+
+        if (cursor < state.displayedChannels.length) {
+            channelScrollObserver = new IntersectionObserver(entries => {
+                if (entries.some(e => e.isIntersecting)) appendChunk();
+            }, { root: container, rootMargin: '500px' });
+            channelScrollObserver.observe(sentinel);
+        } else {
+            sentinel.remove();
+        }
     }
 
     /**
@@ -707,6 +742,8 @@
             }
         } else if (status === 'checking') {
             statusBadgeHtml = `<span class="card-status-badge status-badge-checking" title="Testing availability...">Checking</span>`;
+        } else if (status === 'local') {
+            statusBadgeHtml = `<span class="card-status-badge status-badge-local" title="Local/LAN stream — open directly on your network">⚡ LAN</span>`;
         }
 
         // Server options overlay in the IMAGE AREA (when multiple servers exist)
@@ -798,6 +835,8 @@
             } else {
                 statusBadgeHtml = `<span class="badge-pill badge-health-offline" title="${reason}">Offline</span>`;
             }
+        } else if (status === 'local') {
+            statusBadgeHtml = `<span class="badge-pill badge-health-local" title="Local/LAN stream — open directly">⚡ LAN</span>`;
         }
 
         const logoUrl = channel.logo || '';
@@ -904,6 +943,10 @@
                         badge.classList.add('status-badge-checking');
                         badge.innerHTML = 'Checking';
                         badge.title = 'Testing availability...';
+                    } else if (entry.status === 'local') {
+                        badge.classList.add('status-badge-local');
+                        badge.innerHTML = '⚡ LAN';
+                        badge.title = entry.reason || 'Local network stream';
                     }
                 }
 
@@ -929,6 +972,10 @@
                             listBadge.innerHTML = 'Offline';
                             listBadge.title = entry.reason || 'Offline';
                         }
+                    } else if (entry.status === 'local') {
+                        listBadge.classList.add('badge-health-local');
+                        listBadge.innerHTML = '⚡ LAN';
+                        listBadge.title = entry.reason || 'Local network stream';
                     }
                 }
             });

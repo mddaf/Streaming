@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css">
+    <link rel="stylesheet" href="css/app.css?v=2">
 
     <!-- Hls.js Media Engine -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
@@ -239,10 +239,6 @@
                         <span>Channel Guide</span>
                     </div>
                     <div style="display:flex;align-items:center;gap:8px;">
-                        <label class="offline-toggle-label" title="Hide offline & dead channels" style="display:inline-flex;align-items:center;gap:5px;font-size:0.75rem;color:var(--text-secondary);cursor:pointer;background:rgba(255,255,255,0.04);padding:4px 8px;border-radius:var(--radius-sm);border:1px solid var(--border-subtle);">
-                            <input type="checkbox" id="hide-offline-toggle" style="accent-color:var(--accent-cyan);cursor:pointer;">
-                            <span>Hide Offline</span>
-                        </label>
                         <button type="button" class="action-btn" id="refresh-health-btn" onclick="if(window.streamHealthChecker){window.streamHealthChecker.clearCache();window.location.reload();}" title="Refresh all stream health checks">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
                             <span>Refresh Checks</span>
@@ -461,8 +457,8 @@
     </div>
 
     <!-- Scripts -->
-    <script src="js/proxy-loader.js"></script>
-    <script src="js/health-checker.js"></script>
-    <script src="js/app.js"></script>
+    <script src="js/proxy-loader.js?v=2"></script>
+    <script src="js/health-checker.js?v=2"></script>
+    <script src="js/app.js?v=2"></script>
 </body>
 </html>

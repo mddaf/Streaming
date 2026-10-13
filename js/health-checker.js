@@ -184,16 +184,15 @@ class StreamHealthChecker {
      * Returns: { status: 'online'|'offline', code, reason, errorType }
      * errorType: 'dead' (404/410) | 'geo' (403/451) | 'cors' | 'timeout' | null
      */
-    async probeSingleUrl(url, timeoutMs) {
+    async probeSingleUrl(url, timeoutMs, headers = null) {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-        const isLocalIp = url.includes('172.16.') || url.includes('192.168.') || url.includes('10.') || url.includes('localhost') || url.includes('127.0.0.1');
-        const testTarget = isLocalIp
-            ? url
-            : (window.SmartProxyEngine 
-                ? window.SmartProxyEngine.buildProxyUrl(url, 0)
-                : `https://sports-proxy.md-daf001.workers.dev/?${encodeURIComponent(url)}`);
+        // Probe through the proxy WITH this channel's headers (Referer/UA) so
+        // embed-gated CDNs aren't falsely reported offline (they need the headers).
+        const testTarget = window.SmartProxyEngine
+            ? window.SmartProxyEngine.buildProxyUrl(url, 0, headers)
+            : `https://sports-proxy.md-daf001.workers.dev/?${encodeURIComponent(url)}`;
 
         try {
             const response = await fetch(testTarget, {
@@ -255,9 +254,24 @@ class StreamHealthChecker {
     /**
      * Perform health probe with alternate server mirror failover
      */
+    isLocalUrl(url) {
+        return /\/\/(172\.16\.|192\.168\.|10\.|localhost|127\.0\.0\.1)/.test(url);
+    }
+
     async performCheck(task) {
         const channel = typeof task === 'object' ? task : { url: task };
         const mainUrl = channel.url;
+
+        // LAN/local streams can't be verified from a browser (cross-origin CORS, and
+        // mixed-content when the page is served over HTTPS). Mark them 'local' (neutral)
+        // rather than a misleading 'offline', so they aren't hidden by Hide-Offline.
+        if (this.isLocalUrl(mainUrl)) {
+            const entry = { status: 'local', code: 0, reason: 'Local network — open directly (not verifiable from browser)', timestamp: Date.now() };
+            this.cache.set(mainUrl, entry);
+            this.persistCache();
+            this.notifyChange(mainUrl, entry);
+            return;
+        }
 
         const mainController = new AbortController();
         this.abortControllers.set(mainUrl, mainController);
@@ -267,8 +281,8 @@ class StreamHealthChecker {
         let entry = null;
 
         try {
-            // Check primary URL
-            const primaryResult = await this.probeSingleUrl(mainUrl, this.timeoutMs);
+            // Check primary URL (with this channel's playback headers, if any)
+            const primaryResult = await this.probeSingleUrl(mainUrl, this.timeoutMs, channel.headers);
 
             if (primaryResult.status === 'online') {
                 entry = { ...primaryResult, timestamp: Date.now() };
@@ -280,7 +294,7 @@ class StreamHealthChecker {
                     const mirror = channel.servers[i];
                     if (!mirror.url || mirror.url === mainUrl) continue;
 
-                    const mirrorResult = await this.probeSingleUrl(mirror.url, 3000);
+                    const mirrorResult = await this.probeSingleUrl(mirror.url, 3000, mirror.headers || channel.headers);
                     if (mirrorResult.status === 'online') {
                         entry = {
                             status: 'online',
