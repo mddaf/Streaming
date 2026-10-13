@@ -19,8 +19,29 @@ const PROXY_CONFIG = {
     // Active proxy index (0: primary, 1: corsproxy, 2: allorigins, 3: custom)
     activeProxyIndex: 0,
     // Current active routing mode: 'auto' | 'proxy' | 'direct'
-    currentMode: 'auto'
+    currentMode: 'auto',
+    // Per-stream header overrides {referer, origin, userAgent}. Protected CDNs
+    // (e.g. newkso.ru) require the EMBED-page Referer, not the stream host.
+    // Only the primary Cloudflare Worker honours these; public CORS proxies ignore them.
+    streamHeaders: null
 };
+
+// Set/clear the header overrides for the next stream (call before loading a channel)
+function setStreamHeaders(headers) {
+    PROXY_CONFIG.streamHeaders = headers && (headers.referer || headers.origin || headers.userAgent)
+        ? headers : null;
+}
+
+// Build the ref/origin/ua querystring prefix for the Worker (ends with '&' when non-empty)
+function buildHeaderQS() {
+    const h = PROXY_CONFIG.streamHeaders;
+    if (!h) return '';
+    let qs = '';
+    if (h.referer) qs += 'ref=' + encodeURIComponent(h.referer) + '&';
+    if (h.origin) qs += 'origin=' + encodeURIComponent(h.origin) + '&';
+    if (h.userAgent) qs += 'ua=' + encodeURIComponent(h.userAgent) + '&';
+    return qs;
+}
 
 /**
  * Clean any proxy wrapper from a URL to get the raw target URL
@@ -31,7 +52,10 @@ function unwrapProxyUrl(url) {
         const parts = url.split('?');
         if (parts.length > 1) {
             let rest = parts.slice(1).join('?');
-            if (rest.startsWith('url=')) rest = rest.slice(4);
+            // New Worker form carries header overrides before the target: ...&url=<encoded>.
+            // The encoded target has no literal '&url=' of its own, so match our param only.
+            const m = rest.match(/(?:^|&)url=(.*)$/);
+            if (m) rest = m[1];
             try {
                 return decodeURIComponent(rest);
             } catch (e) {
@@ -57,7 +81,10 @@ function buildProxyUrl(rawUrl, proxyIndex = null) {
     } else if (idx === 2) {
         return PROXY_CONFIG.fallbacks[1] + encodeURIComponent(clean);
     } else {
-        return PROXY_CONFIG.primary + encodeURIComponent(clean);
+        // Primary Worker: attach per-stream header overrides via url= form when present
+        const hqs = buildHeaderQS();
+        return hqs ? PROXY_CONFIG.primary + hqs + 'url=' + encodeURIComponent(clean)
+                   : PROXY_CONFIG.primary + encodeURIComponent(clean);
     }
 }
 
@@ -158,9 +185,32 @@ function createSmartProxyLoader(HlsClass, useProxyAlways = false, proxyIdx = nul
     };
 }
 
+/**
+ * Resolve a channel id via the Worker's /resolve route -> { url, headers }.
+ * Mirrors the reference app: ask the backend for a fresh URL at play time
+ * instead of trusting a static playlist. Then: setStreamHeaders(r.headers);
+ * play buildProxyUrl(r.url).
+ */
+async function resolveStream(id) {
+    const base = PROXY_CONFIG.primary.replace(/\/?\?$/, ''); // strip trailing "/?"
+    const res = await fetch(base + '/resolve?id=' + encodeURIComponent(id));
+    const data = await res.json();
+    if (data.error) throw new Error(data.error + (data.message ? ': ' + data.message : ''));
+    return data; // { url, headers:{referer,origin,userAgent} }
+}
+
+// Fetch the Worker's /catalog route -> [{id,name,group,type}]
+async function fetchCatalog() {
+    const base = PROXY_CONFIG.primary.replace(/\/?\?$/, '');
+    return (await fetch(base + '/catalog')).json();
+}
+
 // Export to window for browser use
 window.SmartProxyEngine = {
     CONFIG: PROXY_CONFIG,
+    setStreamHeaders,
+    resolveStream,
+    fetchCatalog,
     unwrapProxyUrl,
     buildProxyUrl,
     shouldRouteThroughProxy,

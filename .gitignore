@@ -1,0 +1,12 @@
+# Large binaries — keep out of git (44MB of APKs)
+archive/apks/
+*.apk
+*.xapk
+
+# Local review artifacts
+archive/reverse-engineering/shot_*.png
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.playwright-mcp/

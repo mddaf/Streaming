@@ -549,6 +549,21 @@
                 // TV ID
                 const idMatch = line.match(/tvg-id="([^"]+)"/);
                 if (idMatch) current.id = idMatch[1];
+
+                // Per-channel HTTP headers (protected CDNs need the exact UA/Referer)
+                const uaM = line.match(/http-user-agent="([^"]+)"/i);
+                if (uaM) (current.headers = current.headers || {}).userAgent = uaM[1];
+                const refM = line.match(/http-referr?er="([^"]+)"/i);
+                if (refM) (current.headers = current.headers || {}).referer = refM[1];
+            } else if (line.startsWith('#EXTVLCOPT:')) {
+                // #EXTVLCOPT:http-user-agent=... / http-referrer=...
+                const vo = line.slice('#EXTVLCOPT:'.length);
+                const eq = vo.indexOf('=');
+                if (eq > 0) {
+                    const k = vo.slice(0, eq).trim().toLowerCase(), v = vo.slice(eq + 1).trim();
+                    if (k === 'http-user-agent') (current.headers = current.headers || {}).userAgent = v;
+                    else if (k === 'http-referrer' || k === 'http-referer') (current.headers = current.headers || {}).referer = v;
+                }
             } else if (line.startsWith('http://') || line.startsWith('https://')) {
                 current.url = line;
                 if (!current.name) current.name = 'Channel ' + (channels.length + 1);
@@ -1048,6 +1063,9 @@
 
             const hls = new Hls(hlsConfig);
             state.hlsInstance = hls;
+
+            // Pass this channel's required headers to the Worker proxy (null clears)
+            if (window.SmartProxyEngine) window.SmartProxyEngine.setStreamHeaders(channel.headers);
 
             hls.loadSource(streamUrl);
             hls.attachMedia(elements.video);
