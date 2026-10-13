@@ -212,7 +212,12 @@ function createSmartProxyLoader(HlsClass, useProxyAlways = false, proxyIdx = nul
 async function resolveStream(id) {
     const base = PROXY_CONFIG.primary.replace(/\/?\?$/, ''); // strip trailing "/?"
     const res = await fetch(base + '/resolve?id=' + encodeURIComponent(id));
-    const data = await res.json();
+    let data;
+    try {
+        data = await res.json();
+    } catch (e) {
+        throw new Error(`HTTP ${res.status}: failed to parse resolver response`);
+    }
     if (data.error) throw new Error(data.error + (data.message ? ': ' + data.message : ''));
     return data; // { url, headers:{referer,origin,userAgent} }
 }
@@ -220,7 +225,9 @@ async function resolveStream(id) {
 // Fetch the Worker's /catalog route -> [{id,name,group,type}]
 async function fetchCatalog() {
     const base = PROXY_CONFIG.primary.replace(/\/?\?$/, '');
-    return (await fetch(base + '/catalog')).json();
+    const res = await fetch(base + '/catalog');
+    if (!res.ok) throw new Error(`HTTP ${res.status} fetching catalog`);
+    return await res.json();
 }
 
 // Export to window for browser use

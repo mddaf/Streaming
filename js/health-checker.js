@@ -215,8 +215,8 @@ class StreamHealthChecker {
                     code,
                     errorType: isDeadLink ? 'dead' : isGeoBlocked ? 'geo' : 'error',
                     reason: isDeadLink
-                        ? `🔗 Dead Link (${code})` 
-                        : isGeoBlocked 
+                        ? `🔗 Dead Link (${code})`
+                        : isGeoBlocked
                             ? `🌍 Geo-Blocked (${code})`
                             : `HTTP ${code} (${response.statusText || 'Error'})`
                 };
@@ -227,7 +227,7 @@ class StreamHealthChecker {
             // (worker rewrites segment URLs inline, so body content may start with proxied lines)
             const text = await response.text();
             const isM3U = text.includes('#EXTM3U') || text.includes('#EXT-X-') || text.includes('#EXTINF');
-            
+
             if (isM3U || response.status === 206) {
                 return { status: 'online', code: 200, errorType: null, reason: 'Stream Verified Live' };
             }
@@ -252,12 +252,15 @@ class StreamHealthChecker {
     }
 
     /**
-     * Perform health probe with alternate server mirror failover
+     * Local/LAN streams can't be verified from a browser (CORS + mixed-content).
      */
     isLocalUrl(url) {
         return /\/\/(172\.16\.|192\.168\.|10\.|localhost|127\.0\.0\.1)/.test(url);
     }
 
+    /**
+     * Perform health probe with alternate server mirror failover
+     */
     async performCheck(task) {
         const channel = typeof task === 'object' ? task : { url: task };
         const mainUrl = channel.url;
@@ -267,6 +270,41 @@ class StreamHealthChecker {
         // rather than a misleading 'offline', so they aren't hidden by Hide-Offline.
         if (this.isLocalUrl(mainUrl)) {
             const entry = { status: 'local', code: 0, reason: 'Local network — open directly (not verifiable from browser)', timestamp: Date.now() };
+            this.cache.set(mainUrl, entry);
+            this.persistCache();
+            this.notifyChange(mainUrl, entry);
+            return;
+        }
+
+        // Catalog channels (catalog://<id> or channel.catalogId or channel.isCatalog)
+        if (mainUrl && (mainUrl.startsWith('catalog://') || channel.catalogId || channel.isCatalog)) {
+            const catId = channel.catalogId || mainUrl.replace(/^catalog:\/\//, '');
+            const mainController = new AbortController();
+            this.abortControllers.set(mainUrl, mainController);
+            this.notifyChange(mainUrl, { status: 'checking', url: mainUrl });
+
+            let entry = null;
+            try {
+                if (window.SmartProxyEngine && typeof window.SmartProxyEngine.resolveStream === 'function') {
+                    const resolved = await window.SmartProxyEngine.resolveStream(catId);
+                    if (resolved && resolved.url) {
+                        const probeRes = await this.probeSingleUrl(resolved.url, this.timeoutMs, resolved.headers);
+                        entry = { ...probeRes, timestamp: Date.now() };
+                    } else {
+                        entry = { status: 'offline', code: 0, reason: 'Resolver returned no stream URL', timestamp: Date.now() };
+                    }
+                } else {
+                    entry = { status: 'unknown', code: 0, reason: 'Resolver engine not loaded', timestamp: Date.now() };
+                }
+            } catch (err) {
+                entry = { status: 'offline', code: 0, reason: `Resolver failed: ${err.message}`, timestamp: Date.now() };
+            } finally {
+                this.abortControllers.delete(mainUrl);
+            }
+
+            if (!entry) {
+                entry = { status: 'offline', code: 0, reason: 'Health check failed', timestamp: Date.now() };
+            }
             this.cache.set(mainUrl, entry);
             this.persistCache();
             this.notifyChange(mainUrl, entry);
@@ -286,7 +324,7 @@ class StreamHealthChecker {
 
             if (primaryResult.status === 'online') {
                 entry = { ...primaryResult, timestamp: Date.now() };
-            } 
+            }
             // If primary failed, but channel has alternate server mirrors, test them!
             else if (channel.servers && channel.servers.length > 1) {
                 let foundWorkingMirror = false;

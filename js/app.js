@@ -454,7 +454,23 @@
                 return { src, channels: parseM3U(text, src.name) };
             });
 
-            const results = await Promise.allSettled(fetchPromises);
+            // Concurrently ask the Cloudflare Worker for its /catalog channels
+            const catalogPromise = (async () => {
+                if (window.SmartProxyEngine && typeof window.SmartProxyEngine.fetchCatalog === 'function') {
+                    try {
+                        const cat = await window.SmartProxyEngine.fetchCatalog();
+                        if (Array.isArray(cat)) return cat;
+                    } catch (e) {
+                        console.warn('Worker /catalog fetch failed:', e);
+                    }
+                }
+                return [];
+            })();
+
+            const [results, catalogChannels] = await Promise.all([
+                Promise.allSettled(fetchPromises),
+                catalogPromise
+            ]);
             const mergedMap = new Map();
 
             // First add featured web sports streams (beIN Sports etc.)
@@ -498,6 +514,32 @@
                             }
                         }
                     });
+                }
+            });
+
+            // Merge Cloudflare Worker /catalog channels (resolved fresh at play time via catalog://<id>)
+            catalogChannels.forEach(catCh => {
+                if (!catCh || !catCh.id || !catCh.name) return;
+                const normKey = normalizeChannelName(catCh.name) || normalizeChannelName(catCh.id);
+                if (!normKey) return;
+                const catUrl = 'catalog://' + catCh.id;
+                const server = { name: `Server ${'1'} (Worker ${catCh.type || 'Resolver'})`, url: catUrl, isCatalog: true, catalogId: catCh.id };
+
+                if (!mergedMap.has(normKey)) {
+                    mergedMap.set(normKey, {
+                        id: catCh.id, catalogId: catCh.id, isCatalog: true,
+                        name: catCh.name, group: catCh.group || 'Cloudflare Catalog',
+                        type: catCh.type || 'lookup',
+                        category: (catCh.group && catCh.group.toLowerCase().includes('sport')) ? 'sports' : 'general',
+                        country: 'unknown', url: catUrl,
+                        servers: [server], sources: ['Cloudflare Catalog']
+                    });
+                } else {
+                    const existing = mergedMap.get(normKey);
+                    if (!existing.servers.some(s => s.catalogId === catCh.id || s.url === catUrl)) {
+                        existing.servers.push({ ...server, name: `Server ${existing.servers.length + 1} (Worker ${catCh.type || 'Resolver'})` });
+                        if (!existing.sources.includes('Cloudflare Catalog')) existing.sources.push('Cloudflare Catalog');
+                    }
                 }
             });
 
@@ -1086,6 +1128,25 @@
             elements.sportsIframe.src = streamUrl;
             elements.routingBadge.innerHTML = '🌐 Web Feed';
             elements.currentChannelStatus.innerHTML = '<span class="live-pulse-dot"></span> Live Broadcast';
+            return;
+        }
+
+        // Catalog channel: ask the Worker for a fresh stream URL (+ headers) at play time,
+        // then replay with the resolved real URL. Original keeps catalog:// so it re-resolves next time.
+        const catId = currentServer.isCatalog ? (currentServer.catalogId || (streamUrl || '').replace(/^catalog:\/\//, '')) : null;
+        if (catId && window.SmartProxyEngine && window.SmartProxyEngine.resolveStream) {
+            elements.sportsIframe.style.display = 'none';
+            elements.video.style.display = 'block';
+            elements.currentChannelStatus.innerHTML = '<span style="color:var(--accent-amber)">Resolving stream…</span>';
+            window.SmartProxyEngine.resolveStream(catId).then(r => {
+                const resolved = Object.assign({}, channel, {
+                    headers: r.headers || channel.headers,
+                    servers: channel.servers.map((s, i) => i === serverIndex ? Object.assign({}, s, { url: r.url, isCatalog: false }) : s)
+                });
+                playChannel(resolved, serverIndex, true, proxyIndex);
+            }).catch(e => {
+                elements.currentChannelStatus.innerHTML = `<span style="color:var(--accent-rose)">Resolve failed: ${e.message}</span>`;
+            });
             return;
         }
 
