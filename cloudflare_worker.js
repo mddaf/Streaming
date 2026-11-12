@@ -273,19 +273,83 @@ const DEMO_CATALOG = [
 
 // Recovered from res/xml/remote_config_defaults.xml in CRICFy_v7.2.apk.
 // Firebase Remote Config can replace this host at runtime.
-const CRICFY_DEFAULT_CATALOG = 'https://cfygsjsgdj141.top/categories/sports.txt';
+const CRICFY_DEFAULT_CATALOG = 'https://cfydjjufvbh146.top/categories/sports.txt';
+const HDSTREAMZ_DEFAULT_BASE = 'https://service6af36c220c8d5-file-delivery-prd-uk.nomox.ru/h98H1H48izQD1UvJUjjpgOdWjuJvJ5AC/';
+const HDSTREAMZ_DEFAULT_IMAGES = 'https://global6af36c235d5b0-srv-prod-dc.cachora.life/h98H1H48izQD1UvJUjjpgOdWjuJvJ5AC/';
 const sourceCache = new Map();
+
+function normalizeHdCatalog(document, env) {
+    const channels = document?.data?.channels;
+    if (!Array.isArray(channels)) throw new Error('HD Streamz catalog has no data.channels');
+    const sourceUrl = env?.HDSTREAMZ_SOURCE_URL || new URL('313537.php', env?.HDSTREAMZ_BASE_URL || HDSTREAMZ_DEFAULT_BASE).href;
+    return channels.filter(channel => channel.status === 'yes' && channel.type === 't' && channel.id != null && channel.title && channel.sources?.length).map(channel => ({
+        id: 'hdstreamz:' + channel.id, name: channel.title, group: channel.cat_title || 'General',
+        category: ({ Sports: 'sports', News: 'news', Entertainment: 'entertainment', Movies: 'movies', Music: 'music', Kids: 'kids', Documentary: 'documentary' })[channel.cat_title] || 'general',
+        country: ({ Bangladesh: 'bd', India: 'in', Pakistan: 'pk', UK: 'uk', USA: 'us', 'United Kingdom': 'uk', 'United States': 'us', Canada: 'ca', Australia: 'au', Germany: 'de', France: 'fr', Italy: 'it', Spain: 'es' })[channel.cou_title] || 'unknown',
+        logo: channel.logo ? mediaUrl(channel.logo, env?.HDSTREAMZ_IMAGE_URL || HDSTREAMZ_DEFAULT_IMAGES) : '',
+        type: 'chain',
+        resolvers: channel.sources.slice(0, 12).map((source, quality) => ({ type: 'hdstreamz', channelId: channel.id, quality, api: sourceUrl }))
+    }));
+}
+
+async function hdSourceJson(response, env) {
+    const text = (await response.text()).trim();
+    try { return JSON.parse(text); } catch (_) { /* encoded source response */ }
+    const hex = env?.HDSTREAMZ_CODEC_KEY;
+    if (typeof hex !== 'string' || !/^[0-9a-f]{64}$/i.test(hex)) throw new Error('Encoded HD Streamz response requires HDSTREAMZ_CODEC_KEY');
+    const bytes = Uint8Array.from(atob(text), character => character.charCodeAt(0));
+    if (bytes.length <= 256) throw new Error('Invalid HD Streamz encoded response');
+    const key = Uint8Array.from(hex.match(/../g), value => {
+        const byte = parseInt(value, 16);
+        return ((byte << 7) | (byte >>> 3)) & 255;
+    });
+    const inverse = new Uint8Array(256);
+    const permutation = bytes.subarray(bytes.length - 256);
+    if (new Set(permutation).size !== 256) throw new Error('Invalid HD Streamz response permutation');
+    permutation.forEach((value, index) => { inverse[value] = index; });
+    const clear = new Uint8Array(bytes.length - 256);
+    clear.forEach((_, index) => {
+        const byte = bytes[index];
+        clear[index] = inverse[((byte << 5) | (byte >>> 3)) & 255] ^ key[index % 32];
+    });
+    return JSON.parse(new TextDecoder().decode(clear));
+}
+
+async function resolveHdStream(channel, env) {
+    const url = new URL(mediaUrl(channel.api));
+    url.searchParams.set('id', String(channel.channelId));
+    url.searchParams.set('quality', String(channel.quality || 0));
+    url.searchParams.set('type', '0');
+    url.searchParams.set('app', '188');
+    const response = await hdSourceJson(await resolverFetch(url.href), env);
+    const source = response?.data;
+    if (response.status !== 'ok' || !source) throw new Error('HD Streamz source unavailable');
+    if (source.drmType || source.lUrl || /\.mpd(?:[?#]|$)/i.test(source.link || '')) throw new Error('HD Streamz DRM/DASH source is unsupported');
+    if (source.method && source.method !== 'default') throw new Error('Unsupported HD Streamz playback method: ' + source.method);
+    if (source.token || source.url_modifier?.length) throw new Error('HD Streamz source requires a native token or URL modifier');
+    let extra = {};
+    if (source.h?.length > 2) {
+        try {
+            const bytes = Uint8Array.from(atob(source.h.slice(2)), character => character.charCodeAt(0));
+            extra = JSON.parse(new TextDecoder().decode(bytes));
+        } catch (_) { throw new Error('Invalid HD Streamz playback headers'); }
+    }
+    return { url: mediaUrl(source.link), headers: normalizeHeaders({ userAgent: source.ua || '', referer: source.ref || '', ...normalizeHeaders(extra) }) };
+}
 
 function normalizeCatalog(catalog, base) {
     if (!Array.isArray(catalog)) throw new Error('Catalog must return a JSON array');
     return catalog.filter(channel => channel && channel.id != null).map(channel => {
         if (!Array.isArray(channel.formats)) return { ...channel, id: String(channel.id) };
+        const resolvers = channel.formats.filter(format => format.webLink).map(format => ({
+            type: 'channel-item', api: mediaUrl(format.webLink, base), title: format.title
+        }));
+        // Empty webLink means the APK uses its standard channel-detail route.
+        if (channel.slug) resolvers.unshift({ type: 'channel-item', api: mediaUrl('channels/' + encodeURIComponent(String(channel.slug).toLowerCase()) + '.txt', new URL('../', base).href) });
         return {
             id: 'cricfy:' + channel.id, name: channel.title, logo: channel.image,
             group: channel.cat || 'Sports', type: 'chain',
-            resolvers: channel.formats.filter(format => format.webLink).map(format => ({
-                type: 'channel-item', api: mediaUrl(format.webLink, base), title: format.title
-            }))
+            resolvers
         };
     }).filter(channel => channel.id && channel.name);
 }
@@ -293,12 +357,15 @@ function normalizeCatalog(catalog, base) {
 function apkStream(stream, base) {
     if (stream.drmType || stream.drmLicense) throw new Error('DRM stream requires a compatible licensed player');
     const type = Number(stream.type || 0);
-    const common = { headers: stream.headers, requestHeaders: stream.headers };
-    if (type === 9) return { ...common, type: 'premium', id: String(stream.link), channelId: String(stream.link) };
-    if (type === 6) return { ...common, type: 'api', api: mediaUrl(stream.api, base), link: mediaUrl(stream.link, base) };
-    if ([1, 2, 3].includes(type)) return { ...common, type: 'suffix', variant: type, link: stream.link, api: mediaUrl(stream.api, base) };
-    if ([4, 5].includes(type)) return { ...common, type: 'sniff', link: mediaUrl(stream.link, type === 5 ? 'https://vk.com/' : base) };
-    if (type === 0) return { ...common, type: 'direct', link: mediaUrl(stream.link, base) };
+    const [link, ...extra] = String(stream.link || '').split('|');
+    const inlineHeaders = normalizeHeaders(Object.fromEntries(new URLSearchParams(extra.join('|'))));
+    const headers = { ...inlineHeaders, ...normalizeHeaders(stream.headers) };
+    const common = { headers, requestHeaders: headers };
+    if (type === 9) return { ...common, type: 'premium', id: link, channelId: link };
+    if (type === 6) return { ...common, type: 'api', api: mediaUrl(stream.api, base), link: mediaUrl(link, base) };
+    if ([1, 2, 3].includes(type)) return { ...common, type: 'suffix', variant: type, link, api: mediaUrl(stream.api, base) };
+    if ([4, 5].includes(type)) return { ...common, type: 'sniff', link: mediaUrl(link, type === 5 ? 'https://vk.com/' : base) };
+    if (type === 0) return { ...common, type: 'direct', link: mediaUrl(link, base) };
     throw new Error('Unsupported APK stream type: ' + type);
 }
 
@@ -350,6 +417,28 @@ async function resolverFetch(url, overrides, signal) {
     const response = await fetch(mediaUrl(url), { headers, redirect: 'follow', signal: signal ? AbortSignal.any([signal, timeout]) : timeout });
     if (!response.ok) throw new Error('Upstream HTTP ' + response.status);
     return response;
+}
+
+// Supports plain JSON and the APK's legacy AES-CBC catalog transport.
+// Codec keys are server-side deployment secrets; they are never sent to clients.
+async function sourceJson(response, env) {
+    const text = (await response.text()).trim();
+    try { return JSON.parse(text); } catch (_) { /* encoded source */ }
+    const pairs = env?.CRICFY_CODEC_KEYS ? JSON.parse(env.CRICFY_CODEC_KEYS) : [];
+    if (!Array.isArray(pairs) || !pairs.length) throw new Error('Encoded catalog requires CRICFY_CODEC_KEYS');
+    const bytes = Uint8Array.from(atob(text), character => character.charCodeAt(0));
+    const fromHex = value => {
+        if (typeof value !== 'string' || !/^[0-9a-f]{32}$/i.test(value)) throw new Error('Invalid catalog codec key or IV');
+        return Uint8Array.from(value.match(/../g), byte => parseInt(byte, 16));
+    };
+    for (const pair of pairs.slice(0, 4)) {
+        try {
+            const key = await crypto.subtle.importKey('raw', fromHex(pair.key), 'AES-CBC', false, ['decrypt']);
+            const clear = await crypto.subtle.decrypt({ name: 'AES-CBC', iv: fromHex(pair.iv) }, key, bytes);
+            return JSON.parse(new TextDecoder().decode(clear));
+        } catch (_) { /* try the next observed codec version */ }
+    }
+    throw new Error('Catalog codec did not match this response');
 }
 
 // Static extraction only: never execute untrusted scripts in the Worker.
@@ -415,6 +504,7 @@ async function discoverStream(ch, env) {
 
 async function resolveChannel(ch, depth = 0, env) {
     if (depth > 5) throw new Error('resolver chain too deep');
+    if (ch.type === 'hdstreamz') return resolveHdStream(ch, env);
     if (Array.isArray(ch.resolvers)) {
         const errors = [];
         for (const resolver of ch.resolvers) {
@@ -425,7 +515,7 @@ async function resolveChannel(ch, depth = 0, env) {
     }
     if (ch.type === 'channel-item') {
         const response = await resolverFetch(ch.api, ch.requestHeaders || ch.headers);
-        const item = await response.json();
+        const item = await sourceJson(response, env);
         if (!Array.isArray(item.streamUrls) || !item.streamUrls.length) throw new Error('ChannelItem has no streamUrls');
         const errors = [];
         for (const stream of item.streamUrls) {
@@ -485,15 +575,40 @@ async function resolveChannel(ch, depth = 0, env) {
 
 async function loadCatalog(env) {
     if (env && env.CATALOG_URL) {
-        const catalog = await (await resolverFetch(env.CATALOG_URL)).json();
+        const catalog = await sourceJson(await resolverFetch(env.CATALOG_URL), env);
         return normalizeCatalog(catalog, env.CATALOG_URL);
     }
     const catalog = DEMO_CATALOG.map(channel => channel.type === 'feed' ? {
         ...channel, api: env?.SPORTZ_CONFIG_URL || channel.api, field: env?.SPORTZ_FEED_FIELD || channel.field
     } : channel);
-    if (env?.CRICFY_ENABLED === 'false') return catalog;
-    const source = await loadCricfySource(env);
-    return [...catalog, ...source.channels];
+    const sources = await loadAppSources(env);
+    return [...catalog, ...sources.flatMap(source => source.channels)];
+}
+
+async function loadAppSources(env) {
+    return Promise.all([
+        env?.CRICFY_ENABLED === 'false' ? { id: 'cricfy', status: 'disabled', channels: [], count: 0 } : loadCricfySource(env),
+        env?.HDSTREAMZ_ENABLED === 'false' ? { id: 'hdstreamz', status: 'disabled', channels: [], count: 0 } : loadHdSource(env)
+    ]);
+}
+
+async function loadHdSource(env) {
+    const url = env?.HDSTREAMZ_CATALOG_URL || new URL('data179.json', env?.HDSTREAMZ_BASE_URL || HDSTREAMZ_DEFAULT_BASE).href;
+    const cacheKey = 'hdstreamz:' + url;
+    const cached = sourceCache.get(cacheKey);
+    if (cached && cached.expires > Date.now()) return cached.promise;
+    const promise = (async () => {
+        try {
+            const channels = normalizeHdCatalog(await hdSourceJson(await resolverFetch(url), env), env);
+            return { id: 'hdstreamz', url, status: 'available', channels, count: channels.length };
+        } catch (error) {
+            const channels = cached ? (await cached.promise).channels : [];
+            return { id: 'hdstreamz', url, status: channels.length ? 'stale' : 'unavailable', channels, count: channels.length, message: error.message };
+        }
+    })();
+    if (sourceCache.size >= 8) sourceCache.delete(sourceCache.keys().next().value);
+    sourceCache.set(cacheKey, { promise, expires: Date.now() + 60000 });
+    return promise;
 }
 
 async function loadCricfySource(env) {
@@ -502,7 +617,7 @@ async function loadCricfySource(env) {
     if (cached && cached.expires > Date.now()) return cached.promise;
     const promise = (async () => {
         try {
-            const channels = normalizeCatalog(await (await resolverFetch(url)).json(), url);
+            const channels = normalizeCatalog(await sourceJson(await resolverFetch(url), env), url);
             return { id: 'cricfy', url, status: 'available', channels, count: channels.length };
         } catch (e) {
             const previous = cached ? await cached.promise : null;
@@ -519,7 +634,7 @@ async function loadCricfySource(env) {
 // GET /catalog  -> public channel list (no internal api/template fields leaked)
 async function handleCatalog(env) {
     const cat = await loadCatalog(env);
-    const pub = cat.map(c => ({ id: c.id, name: c.name, logo: c.logo || '', group: c.group || '', type: c.type || 'direct' }));
+    const pub = cat.map(c => ({ id: c.id, name: c.name, logo: c.logo || '', group: c.group || '', category: c.category || '', country: c.country || '', type: c.type || 'direct' }));
     return new Response(JSON.stringify(pub), { headers: JSON_CORS });
 }
 
@@ -547,10 +662,9 @@ async function handleRequest(request, env) {
     try {
         if (path === '/sources') {
             const sniffer = { id: 'sniffer', status: env?.DYNAMIC_SNIFFER || env?.DYNAMIC_SNIFFER_URL ? 'configured' : 'not configured' };
-            if (env?.CRICFY_ENABLED === 'false') return new Response(JSON.stringify([{ id: 'cricfy', status: 'disabled', count: 0 }, sniffer]), { headers: JSON_CORS });
-            const source = await loadCricfySource(env);
-            const { channels, ...status } = source;
-            return new Response(JSON.stringify([status, sniffer]), { headers: JSON_CORS });
+            const sources = await loadAppSources(env);
+            const status = sources.map(({ channels, ...metadata }) => metadata);
+            return new Response(JSON.stringify([...status, sniffer]), { headers: JSON_CORS });
         }
         if (path === '/sniff') {
             const link = new URL(request.url).searchParams.get('url');

@@ -2,10 +2,11 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
+const nodeCrypto = require('node:crypto');
 
 function worker(routes = {}) {
     const calls = [];
-    const context = vm.createContext({ URL, Headers, Request, Response, AbortSignal, atob,
+    const context = vm.createContext({ URL, URLSearchParams, Headers, Request, Response, AbortSignal, atob, TextDecoder, crypto: nodeCrypto.webcrypto,
         fetch: async (url, options) => {
             calls.push({ url, options });
             const result = routes[url];
@@ -143,7 +144,7 @@ test('unavailable APK catalog does not hide default channels and exposes source 
     const [source] = await response.json();
     assert.equal(source.status, 'unavailable');
     assert.equal(source.count, 0);
-    assert.equal(calls.length, 1, 'failed source should be cached');
+    assert.equal(calls.filter(call => call.url.includes('cfydjjufvbh146.top')).length, 1, 'failed CRICFy source should be cached');
 });
 
 test('dynamic sniffer fallback forwards the service token and captured headers', async () => {
@@ -181,4 +182,69 @@ test('automatic source refresh preserves the last good catalog during an upstrea
     assert.equal(stale.status, 'stale');
     assert.equal(stale.channels[0].name, 'Saved Sports');
     assert.equal(stale.count, 1);
+});
+
+test('encoded catalog and channel details resolve through the APK slug fallback', async () => {
+    const codec = { key: '00112233445566778899aabbccddeeff', iv: 'ffeeddccbbaa99887766554433221100' };
+    const encode = data => {
+        const cipher = nodeCrypto.createCipheriv('aes-128-cbc', Buffer.from(codec.key, 'hex'), Buffer.from(codec.iv, 'hex'));
+        return Buffer.concat([cipher.update(JSON.stringify(data)), cipher.final()]).toString('base64');
+    };
+    const catalogUrl = 'https://catalog.test/categories/sports.txt';
+    const { context } = worker({
+        [catalogUrl]: encode([{ id: '45', title: 'Fixture Sports', slug: 'Fixture', cat: 'Sports', formats: [{ title: 'HD', webLink: '' }] }]),
+        'https://catalog.test/channels/fixture.txt': encode({ streamUrls: [{ type: '0', link: 'https://cdn.test/live.m3u8|User-Agent=Fixture&Referer=https%3A%2F%2Fembed.test%2F' }] })
+    });
+    const env = { CATALOG_URL: catalogUrl, CRICFY_CODEC_KEYS: JSON.stringify([codec]) };
+    const catalog = await context.loadCatalog(env);
+    assert.equal(catalog.length, 1);
+    assert.equal(catalog[0].resolvers[0].api, 'https://catalog.test/channels/fixture.txt');
+    const stream = await context.resolveChannel(catalog[0], 0, env);
+    assert.equal(stream.url, 'https://cdn.test/live.m3u8');
+    assert.equal(stream.headers.userAgent, 'Fixture');
+    assert.equal(stream.headers.referer, 'https://embed.test/');
+    const publicCatalog = await context.handleCatalog(env);
+    assert.ok(!(await publicCatalog.text()).includes(codec.key));
+});
+
+test('encoded sources report missing or incorrect codec configuration explicitly', async () => {
+    const { context } = worker();
+    await assert.rejects(context.sourceJson(new Response('YWJjZA==')), /CRICFY_CODEC_KEYS/);
+    await assert.rejects(context.sourceJson(new Response('YWJjZA=='), { CRICFY_CODEC_KEYS: '[{"key":"bad","iv":"bad"}]' }), /did not match/);
+});
+
+test('HD Streamz catalog maps channels to source requests and falls back from DRM to HLS', async () => {
+    const codecKey = '00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff';
+    const key = Buffer.from(codecKey, 'hex').map(byte => ((byte << 7) | (byte >>> 3)) & 255);
+    const encode = object => {
+        const text = Buffer.from(JSON.stringify(object));
+        const data = Buffer.alloc(text.length + 256);
+        text.forEach((byte, index) => { const value = byte ^ key[index % 32]; data[index] = ((value << 3) | (value >>> 5)) & 255; });
+        for (let i = 0; i < 256; i++) data[text.length + i] = i;
+        return data.toString('base64');
+    };
+    const api = 'https://hd.test/313537.php';
+    const { context } = worker({
+        [api + '?id=7&quality=0&type=0&app=188']: { body: { status: 'ok', data: { drmType: 'widevine', link: 'https://cdn.test/live.mpd' } } },
+        [api + '?id=7&quality=1&type=0&app=188']: encode({ status: 'ok', data: { method: 'default', link: 'https://cdn.test/live.m3u8', ua: 'Fixture', h: 'xx' + Buffer.from(JSON.stringify({ Referer: 'https://embed.test/' })).toString('base64') } })
+    });
+    const env = { HDSTREAMZ_SOURCE_URL: api, HDSTREAMZ_CODEC_KEY: codecKey, HDSTREAMZ_IMAGE_URL: 'https://images.test/' };
+    const channels = context.normalizeHdCatalog({ data: { channels: [
+        { id: 7, title: 'Fixture Sports', cat_title: 'Sports', type: 't', status: 'yes', logo: 'sport.png', sources: [{ id: 10 }, { id: 11 }] },
+        { id: 8, title: 'Disabled', type: 't', status: 'no', sources: [{ id: 12 }] }
+    ] } }, env);
+    assert.equal(channels.length, 1);
+    assert.equal(channels[0].id, 'hdstreamz:7');
+    assert.equal(channels[0].logo, 'https://images.test/sport.png');
+    const stream = await context.resolveChannel(channels[0], 0, env);
+    assert.equal(stream.url, 'https://cdn.test/live.m3u8');
+    assert.equal(stream.headers.userAgent, 'Fixture');
+    assert.equal(stream.headers.referer, 'https://embed.test/');
+});
+
+test('HD Streamz native-only methods are rejected explicitly', async () => {
+    const api = 'https://hd.test/source?id=1&quality=0&type=0&app=188';
+    const { context } = worker({ [api]: { body: { status: 'ok', data: { method: 'self', link: 'native-code' } } } });
+    await assert.rejects(context.resolveHdStream({ api: 'https://hd.test/source', channelId: 1 }, {}), /playback method/);
+    await assert.rejects(context.hdSourceJson(new Response('YWJjZA=='), {}), /HDSTREAMZ_CODEC_KEY/);
 });

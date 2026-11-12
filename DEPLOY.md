@@ -1,7 +1,6 @@
 # Deploy the proxy and browser sniffer
 
-Both Workers are prepared for your Cloudflare account. Nothing has been deployed
-from this workspace. The sniffer uses Cloudflare's hosted browser through a
+Both Workers are deployed to the configured Cloudflare account. The sniffer uses Cloudflare's hosted browser through a
 private service binding, so you do not need a VPS, a separate sniffer URL, or a
 shared sniffer token for this setup.
 
@@ -41,18 +40,26 @@ discovery, then the private browser sniffer. Runtime capture returns a verified
 manifest URL and the browser's playback headers; if discovery fails, featured
 web channels retain their original embed fallback.
 
-CRICFy's recovered default host failed DNS lookup during verification. Neither
-Worker deployment nor the sniffer creates a channel catalog. Existing playlist
-channels and available web feeds remain usable independently. If you later
-obtain a working catalog, add `CRICFY_CATALOG_URL` as a proxy Worker environment
-variable. The deploy configuration preserves dashboard variables. You do not
-need to redeploy the frontend for source variable changes.
+The APK's old bundled CRICFy host failed DNS lookup. Its current host was
+recovered from activated Remote Config and now supplies 57 channel groups.
+HD Streamz's recovered catalog supplies 794 enabled TV entries. These counts
+are metadata, not a guarantee of playable broadcasts. Neither the Worker nor
+the sniffer invents a catalog when an upstream is unavailable.
+
+The current account has server-side `CRICFY_CODEC_KEYS` and
+`HDSTREAMZ_CODEC_KEY` secrets configured for the observed catalog/source
+transport formats. Future code deployments preserve these secrets. A new
+Cloudflare account needs equivalent codec configuration for encoded responses;
+the keys are deliberately not committed. These are source transport codecs,
+not DRM license keys. Use the optional source URL variables documented in
+`RESOLVERS.md` when a provider changes hosts. The deploy configuration preserves
+dashboard variables; frontend redeployment is not needed for variable changes.
 
 ## Automatic updates
 
 - The website refreshes its Worker catalog every five minutes while visible,
   and catches up after returning to a hidden tab. Playback is not restarted.
-- The Worker re-fetches CRICFy's catalog on demand after a 60-second cache
+- The Worker re-fetches CRICFy and HD Streamz catalogs on demand after a 60-second cache
   expires. It retains the last successful catalog in that running Worker
   instance when an upstream refresh fails and reports `stale` source status.
   This cache is not durable across Worker restarts or data centers.

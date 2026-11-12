@@ -529,8 +529,8 @@
                         id: catCh.id, catalogId: catCh.id, isCatalog: true,
                         name: catCh.name, logo: catCh.logo || '', group: catCh.group || 'Cloudflare Catalog',
                         type: catCh.type || 'lookup',
-                        category: (catCh.group && catCh.group.toLowerCase().includes('sport')) ? 'sports' : 'general',
-                        country: 'unknown', url: catUrl,
+                        category: catCh.category || ((catCh.group && catCh.group.toLowerCase().includes('sport')) ? 'sports' : 'general'),
+                        country: catCh.country || 'unknown', url: catUrl,
                         servers: [server], sources: ['Cloudflare Catalog']
                     });
                 } else {
@@ -1199,7 +1199,9 @@
             state.resolveController = controller;
             window.SmartProxyEngine.resolveStream(catId, controller.signal).then(r => {
                 if (requestId !== state.playbackRequest) return;
-                playChannel(channel, serverIndex, true, proxyIndex, r);
+                const headers = r.headers || {};
+                const requiresHeaders = !!(headers.referer || headers.origin || headers.userAgent);
+                playChannel(channel, serverIndex, forceProxy || requiresHeaders, proxyIndex, r);
             }).catch(e => {
                 if (requestId !== state.playbackRequest || controller.signal.aborted) return;
                 elements.currentChannelStatus.textContent = 'Resolve failed: ' + e.message;

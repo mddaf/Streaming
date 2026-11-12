@@ -63,6 +63,14 @@ test('catalog playback preserves canonical server and recents, forwards playback
     assert.equal(pending.length, 2);
 });
 
+test('headerless catalog HLS uses direct-first routing', async () => {
+    const { playChannel, pending, nodes } = app();
+    playChannel(catalog('public'));
+    pending[0].resolve({ url: 'https://cdn.test/public.m3u8', headers: {} });
+    await flush();
+    assert.equal(nodes.get('main-video').src, 'https://cdn.test/public.m3u8');
+});
+
 test('web feed discovery falls back to its iframe on static sniff failure', async () => {
     const { playChannel, pending, nodes } = app();
     const channel = { name: 'Embed', type: 'web', url: 'https://embed.test/' };
