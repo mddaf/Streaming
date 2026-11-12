@@ -4,6 +4,7 @@
   "main": "../cloudflare_worker.js",
   "compatibility_date": "2026-11-12",
   "workers_dev": true,
+  "preview_urls": false,
   "keep_vars": true,
   "services": [
     { "binding": "DYNAMIC_SNIFFER", "service": "streampulse-sniffer" }

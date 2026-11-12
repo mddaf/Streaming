@@ -16,8 +16,8 @@ reverse-engineering/
 apks/
 APK_ANALYSIS.md
 tools/node_modules/
-tools/.wrangler/
-tools/.deploy-build/
+.wrangler/
+.deploy-build/
 .dev.vars
 .dev.vars.*
 .env
