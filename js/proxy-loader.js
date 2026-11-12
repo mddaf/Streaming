@@ -218,23 +218,31 @@ function createSmartProxyLoader(HlsClass, useProxyAlways = false, proxyIdx = nul
  * instead of trusting a static playlist. Then: setStreamHeaders(r.headers);
  * play buildProxyUrl(r.url).
  */
-async function resolveStream(id) {
+async function resolverRequest(path, params = {}, signal) {
     const base = PROXY_CONFIG.primary.replace(/\/?\?$/, ''); // strip trailing "/?"
-    const res = await fetch(base + '/resolve?id=' + encodeURIComponent(id));
+    const timeout = AbortSignal.timeout(35000);
+    const res = await fetch(base + path + '?' + new URLSearchParams(params), {
+        signal: signal ? AbortSignal.any([signal, timeout]) : timeout
+    });
     let data;
     try {
         data = await res.json();
     } catch (e) {
         throw new Error(`HTTP ${res.status}: failed to parse resolver response`);
     }
-    if (data.error) throw new Error(data.error + (data.message ? ': ' + data.message : ''));
+    if (!res.ok || data.error) throw new Error((data.error || 'HTTP ' + res.status) + (data.message ? ': ' + data.message : ''));
+    if (typeof data.url !== 'string' || !/^https?:\/\//i.test(data.url)) throw new Error('Resolver returned an invalid stream URL');
     return data; // { url, headers:{referer,origin,userAgent} }
 }
+
+function resolveStream(id, signal) { return resolverRequest('/resolve', { id }, signal); }
+function sniffStream(url, signal) { return resolverRequest('/sniff', { url }, signal); }
+function fetchFeed(signal) { return resolverRequest('/feed', {}, signal); }
 
 // Fetch the Worker's /catalog route -> [{id,name,group,type}]
 async function fetchCatalog() {
     const base = PROXY_CONFIG.primary.replace(/\/?\?$/, '');
-    const res = await fetch(base + '/catalog');
+    const res = await fetch(base + '/catalog', { cache: 'no-store', signal: AbortSignal.timeout(12000) });
     if (!res.ok) throw new Error(`HTTP ${res.status} fetching catalog`);
     return await res.json();
 }
@@ -245,6 +253,8 @@ window.SmartProxyEngine = {
     setStreamHeaders,
     setCustomProxy,
     resolveStream,
+    sniffStream,
+    fetchFeed,
     fetchCatalog,
     unwrapProxyUrl,
     buildProxyUrl,

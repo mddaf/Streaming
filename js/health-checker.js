@@ -289,8 +289,10 @@ class StreamHealthChecker {
             let entry = null;
             try {
                 if (window.SmartProxyEngine && typeof window.SmartProxyEngine.resolveStream === 'function') {
-                    const resolved = await window.SmartProxyEngine.resolveStream(catId);
-                    if (resolved && resolved.url) {
+                    const resolved = await window.SmartProxyEngine.resolveStream(catId, mainController.signal);
+                    if (resolved && resolved.type === 'web') {
+                        entry = { status: 'unknown', code: 0, reason: 'Embedded feed page; video availability is not verified', timestamp: Date.now() };
+                    } else if (resolved && resolved.url) {
                         const probeRes = await this.probeSingleUrl(resolved.url, this.timeoutMs, resolved.headers);
                         entry = { ...probeRes, timestamp: Date.now() };
                     } else {

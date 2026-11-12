@@ -116,6 +116,9 @@
         displayedChannels: [],
         currentChannel: null,
         currentServerIndex: 0,
+        activePlaybackUrl: null,
+        playbackRequest: 0,
+        resolveController: null,
         favorites: new Set(),
         recentChannels: [],
         hlsInstance: null,
@@ -123,6 +126,8 @@
         diagnosticsOpen: false,
         diagTimer: null,
         isLoading: false,
+        catalogRefreshing: false,
+        lastCatalogRefresh: 0,
         bdixServers: [],
         bdixActiveCategory: 'all',
         bdixSearchQuery: ''
@@ -193,6 +198,10 @@
         renderFilterChips();
         renderSourcesModalList();
         loadAndMergeAllSources();
+        setInterval(refreshWorkerCatalog, 5 * 60 * 1000);
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && Date.now() - state.lastCatalogRefresh >= 5 * 60 * 1000) refreshWorkerCatalog();
+        });
     }
 
     function loadSavedData() {
@@ -472,33 +481,8 @@
                 }
             });
 
-            // Merge Cloudflare Worker /catalog channels (resolved fresh at play time via catalog://<id>)
-            catalogChannels.forEach(catCh => {
-                if (!catCh || !catCh.id || !catCh.name) return;
-                const normKey = normalizeChannelName(catCh.name) || normalizeChannelName(catCh.id);
-                if (!normKey) return;
-                const catUrl = 'catalog://' + catCh.id;
-                const server = { name: `Server ${'1'} (Worker ${catCh.type || 'Resolver'})`, url: catUrl, isCatalog: true, catalogId: catCh.id };
-
-                if (!mergedMap.has(normKey)) {
-                    mergedMap.set(normKey, {
-                        id: catCh.id, catalogId: catCh.id, isCatalog: true,
-                        name: catCh.name, group: catCh.group || 'Cloudflare Catalog',
-                        type: catCh.type || 'lookup',
-                        category: (catCh.group && catCh.group.toLowerCase().includes('sport')) ? 'sports' : 'general',
-                        country: 'unknown', url: catUrl,
-                        servers: [server], sources: ['Cloudflare Catalog']
-                    });
-                } else {
-                    const existing = mergedMap.get(normKey);
-                    if (!existing.servers.some(s => s.catalogId === catCh.id || s.url === catUrl)) {
-                        existing.servers.push({ ...server, name: `Server ${existing.servers.length + 1} (Worker ${catCh.type || 'Resolver'})` });
-                        if (!existing.sources.includes('Cloudflare Catalog')) existing.sources.push('Cloudflare Catalog');
-                    }
-                }
-            });
-
-            state.masterChannels = Array.from(mergedMap.values());
+            state.masterChannels = reconcileWorkerCatalog(Array.from(mergedMap.values()), catalogChannels);
+            state.lastCatalogRefresh = Date.now();
             state.isLoading = false;
 
             applyFiltersAndRender();
@@ -516,6 +500,64 @@
                     <button class="action-btn" style="margin-top:14px;" onclick="location.reload()">Retry</button>
                 </div>
             `;
+        }
+    }
+
+    function reconcileWorkerCatalog(channels, catalogChannels) {
+        const mergedMap = new Map();
+        for (const channel of channels) {
+            const servers = (channel.servers || [{ url: channel.url }]).filter(server => !server.isCatalog && !server.url?.startsWith('catalog://'));
+            if (!servers.length) continue;
+            const copy = { ...channel, servers, sources: (channel.sources || []).filter(source => source !== 'Cloudflare Catalog') };
+            if (copy.url?.startsWith('catalog://')) {
+                copy.url = servers[0].url;
+                copy.type = 'direct';
+                delete copy.catalogId;
+                delete copy.isCatalog;
+            }
+            mergedMap.set(normalizeChannelName(copy.name), copy);
+        }
+        catalogChannels.forEach(catCh => {
+                if (!catCh || !catCh.id || !catCh.name) return;
+                const normKey = normalizeChannelName(catCh.name) || normalizeChannelName(catCh.id);
+                if (!normKey) return;
+                const catUrl = 'catalog://' + catCh.id;
+                const server = { name: `Server ${'1'} (Worker ${catCh.type || 'Resolver'})`, url: catUrl, isCatalog: true, catalogId: catCh.id };
+
+                if (!mergedMap.has(normKey)) {
+                    mergedMap.set(normKey, {
+                        id: catCh.id, catalogId: catCh.id, isCatalog: true,
+                        name: catCh.name, logo: catCh.logo || '', group: catCh.group || 'Cloudflare Catalog',
+                        type: catCh.type || 'lookup',
+                        category: (catCh.group && catCh.group.toLowerCase().includes('sport')) ? 'sports' : 'general',
+                        country: 'unknown', url: catUrl,
+                        servers: [server], sources: ['Cloudflare Catalog']
+                    });
+                } else {
+                    const existing = mergedMap.get(normKey);
+                    if (!existing.servers.some(s => s.catalogId === catCh.id || s.url === catUrl)) {
+                        existing.servers.push({ ...server, name: `Server ${existing.servers.length + 1} (Worker ${catCh.type || 'Resolver'})` });
+                        if (!existing.sources.includes('Cloudflare Catalog')) existing.sources.push('Cloudflare Catalog');
+                    }
+                }
+            });
+
+        return Array.from(mergedMap.values());
+    }
+
+    async function refreshWorkerCatalog() {
+        if (document.hidden || state.isLoading || state.catalogRefreshing || !window.SmartProxyEngine?.fetchCatalog) return;
+        state.catalogRefreshing = true;
+        try {
+            const catalog = await window.SmartProxyEngine.fetchCatalog();
+            if (!Array.isArray(catalog)) throw new Error('Invalid catalog response');
+            state.masterChannels = reconcileWorkerCatalog(state.masterChannels, catalog);
+            state.lastCatalogRefresh = Date.now();
+            applyFiltersAndRender();
+        } catch (error) {
+            console.warn('Catalog refresh failed; keeping the current guide:', error.message);
+        } finally {
+            state.catalogRefreshing = false;
         }
     }
 
@@ -1000,7 +1042,12 @@
     /* --------------------------------------------------------------------------
        Stream Playback Controller with On-Screen Server Switcher & Geo-Bypass
        -------------------------------------------------------------------------- */
-    function playChannel(channel, serverIndex = 0, forceProxy = false, proxyIndex = 0) {
+    function playChannel(channel, serverIndex = 0, forceProxy = false, proxyIndex = 0, playback = null) {
+        const requestId = ++state.playbackRequest;
+        if (state.resolveController) state.resolveController.abort();
+        state.resolveController = null;
+        elements.video.onerror = null;
+        elements.video.onloadedmetadata = null;
         state.currentChannel = channel;
         state.currentServerIndex = serverIndex;
 
@@ -1050,7 +1097,8 @@
             : [{ name: 'Server 1', url: channel.url }];
 
         const currentServer = servers[serverIndex] || servers[0];
-        const streamUrl = currentServer.url;
+        const streamUrl = playback ? playback.url : currentServer.url;
+        state.activePlaybackUrl = /^https?:\/\//i.test(streamUrl || '') ? streamUrl : null;
 
         elements.currentStreamUrlBadge.textContent = streamUrl ? streamUrl.split('/')[2] || 'Stream Host' : '';
         elements.currentStreamUrlBadge.title = streamUrl || '';
@@ -1094,7 +1142,38 @@
         }
 
         // Check if Web Feed (Iframe mode for beIN Sports etc.)
-        if (channel.type === 'web') {
+        if (playback?.type === 'web') {
+            if (state.hlsInstance) { state.hlsInstance.destroy(); state.hlsInstance = null; }
+            elements.video.pause();
+            elements.video.style.display = 'none';
+            elements.sportsIframe.style.display = 'block';
+            elements.sportsIframe.src = streamUrl;
+            elements.routingBadge.textContent = 'Web Feed';
+            elements.currentChannelStatus.textContent = 'Embedded feed page';
+            return;
+        }
+        if (channel.type === 'web' && !currentServer.isCatalog && !playback) {
+            if (window.SmartProxyEngine?.sniffStream) {
+                if (state.hlsInstance) { state.hlsInstance.destroy(); state.hlsInstance = null; }
+                elements.video.pause();
+                elements.sportsIframe.removeAttribute('src');
+                elements.currentChannelStatus.textContent = 'Finding stream…';
+                const controller = new AbortController();
+                state.resolveController = controller;
+                window.SmartProxyEngine.sniffStream(streamUrl, controller.signal).then(result => {
+                    if (requestId !== state.playbackRequest) return;
+                    playChannel(channel, serverIndex, true, proxyIndex, result);
+                }).catch(error => {
+                    if (requestId !== state.playbackRequest || controller.signal.aborted) return;
+                    console.info('Static sniff unavailable; using embed player:', error.message);
+                    elements.video.style.display = 'none';
+                    elements.sportsIframe.style.display = 'block';
+                    elements.sportsIframe.src = streamUrl;
+                    elements.routingBadge.textContent = 'Web Feed';
+                    elements.currentChannelStatus.textContent = 'Embedded player';
+                });
+                return;
+            }
             // stop any HLS stream still playing behind the embed
             if (state.hlsInstance) { state.hlsInstance.destroy(); state.hlsInstance = null; }
             elements.video.pause();
@@ -1109,18 +1188,22 @@
         // Catalog channel: ask the Worker for a fresh stream URL (+ headers) at play time,
         // then replay with the resolved real URL. Original keeps catalog:// so it re-resolves next time.
         const catId = currentServer.isCatalog ? (currentServer.catalogId || (streamUrl || '').replace(/^catalog:\/\//, '')) : null;
-        if (catId && window.SmartProxyEngine && window.SmartProxyEngine.resolveStream) {
+        if (catId && !playback && window.SmartProxyEngine && window.SmartProxyEngine.resolveStream) {
+            if (state.hlsInstance) { state.hlsInstance.destroy(); state.hlsInstance = null; }
+            elements.video.pause();
+            elements.sportsIframe.removeAttribute('src');
             elements.sportsIframe.style.display = 'none';
             elements.video.style.display = 'block';
             elements.currentChannelStatus.innerHTML = '<span style="color:var(--accent-amber)">Resolving stream…</span>';
-            window.SmartProxyEngine.resolveStream(catId).then(r => {
-                const resolved = Object.assign({}, channel, {
-                    headers: r.headers || channel.headers,
-                    servers: channel.servers.map((s, i) => i === serverIndex ? Object.assign({}, s, { url: r.url, isCatalog: false }) : s)
-                });
-                playChannel(resolved, serverIndex, true, proxyIndex);
+            const controller = new AbortController();
+            state.resolveController = controller;
+            window.SmartProxyEngine.resolveStream(catId, controller.signal).then(r => {
+                if (requestId !== state.playbackRequest) return;
+                playChannel(channel, serverIndex, true, proxyIndex, r);
             }).catch(e => {
-                elements.currentChannelStatus.innerHTML = `<span style="color:var(--accent-rose)">Resolve failed: ${e.message}</span>`;
+                if (requestId !== state.playbackRequest || controller.signal.aborted) return;
+                elements.currentChannelStatus.textContent = 'Resolve failed: ' + e.message;
+                if (serverIndex + 1 < servers.length) playChannel(channel, serverIndex + 1);
             });
             return;
         }
@@ -1130,6 +1213,7 @@
         elements.sportsIframe.style.display = 'none';
         elements.video.style.display = 'block';
 
+        if (window.SmartProxyEngine) window.SmartProxyEngine.setStreamHeaders(playback?.headers || currentServer.headers || channel.headers);
         const needProxy = forceProxy || (window.SmartProxyEngine && window.SmartProxyEngine.shouldRouteThroughProxy(streamUrl));
 
         // Update routing badge
@@ -1161,13 +1245,11 @@
             const hls = new Hls(hlsConfig);
             state.hlsInstance = hls;
 
-            // Pass this channel's required headers to the Worker proxy (null clears)
-            if (window.SmartProxyEngine) window.SmartProxyEngine.setStreamHeaders(channel.headers);
-
             hls.loadSource(streamUrl);
             hls.attachMedia(elements.video);
 
             hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
+                if (requestId !== state.playbackRequest) return;
                 elements.currentChannelStatus.innerHTML = '<span class="live-pulse-dot"></span> Stream Live';
                 if (channel) channel._proxyIndex = proxyIndex; // remember the route that worked
                 elements.video.play().catch(() => {
@@ -1185,6 +1267,7 @@
             });
 
             hls.on(Hls.Events.ERROR, async (event, data) => {
+                if (requestId !== state.playbackRequest) return;
                 // A direct public stream hit a network error (segment blocked by CORS or mixed content):
                 // hls.js would retry for ~30s before giving up, so switch to the proxy straight away.
                 const isPublic = !(window.SmartProxyEngine && window.SmartProxyEngine.isPrivateUrl(streamUrl));
@@ -1252,7 +1335,9 @@
                     if (servers.length > serverIndex + 1) {
                         const nextIdx = serverIndex + 1;
                         elements.currentChannelStatus.innerHTML = `<span style="color:var(--accent-amber)">Auto-switching to Server ${nextIdx + 1}...</span>`;
-                        setTimeout(() => playChannel(channel, nextIdx), 800);
+                        setTimeout(() => {
+                            if (requestId === state.playbackRequest) playChannel(channel, nextIdx);
+                        }, 800);
                         return;
                     }
 
@@ -1846,8 +1931,8 @@
 
         elements.popoutBtn.addEventListener('click', () => {
             if (state.currentChannel) {
-                const targetUrl = state.currentChannel.url;
-                window.open(targetUrl, '_blank', 'width=1280,height=720,toolbar=0,menubar=0');
+                const targetUrl = state.activePlaybackUrl;
+                if (targetUrl) window.open(targetUrl, '_blank', 'width=1280,height=720,toolbar=0,menubar=0');
             }
         });
 

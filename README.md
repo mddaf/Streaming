@@ -4,6 +4,12 @@ A high-performance, modern web application for watching free-to-air IPTV, live s
 
 Live Demo: https://mddaf.github.io/Streaming/
 
+Resolver endpoints, APK-reference lookup/API chains, static M3U8 discovery,
+catalog configuration, and validation commands are documented in
+[RESOLVERS.md](./RESOLVERS.md). Deploy the updated Worker to enable these routes.
+Deploy the proxy and private Cloudflare browser sniffer, and enable automatic
+updates, using [DEPLOY.md](./DEPLOY.md).
+
 ---
 
 ## 🚀 Key Features

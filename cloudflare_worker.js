@@ -206,7 +206,7 @@ async function handleProxyRequest(request) {
             responseHeaders.delete('content-encoding');
 
             const manifestText = await upstreamResponse.text();
-            const rewrittenManifest = rewriteManifestUrls(manifestText, targetUrl, workerBaseUrl, overridesToQS(ov));
+            const rewrittenManifest = rewriteManifestUrls(manifestText, upstreamResponse.url || targetUrl, workerBaseUrl, overridesToQS(ov));
 
             return new Response(rewrittenManifest, {
                 status: upstreamResponse.status,
@@ -241,11 +241,10 @@ async function handleProxyRequest(request) {
 }
 
 /* ===========================================================================
-   STREAM RESOLVER  (learning build — mirrors the reference app's architecture)
+   STREAM RESOLVER — catalog, lookup/API chains, feed and embed discovery
    ---------------------------------------------------------------------------
    The reference apps don't ship stream URLs; they resolve them at play time.
-   This reproduces that pattern GENERICALLY, against sources YOU control/own.
-   Point it at your own origin or legal/free sources — not at anyone's catalog.
+   Sources and per-channel resolver chains are configured through CATALOG_URL.
 
    Each channel mirrors the app's model {id, name, type, link, api, headers}:
      type "direct" : link is already the .m3u8                      -> play as-is
@@ -256,6 +255,8 @@ async function handleProxyRequest(request) {
    Swap DEMO_CATALOG for your own, or set env.CATALOG_URL to a JSON array.
    =========================================================================== */
 const DEMO_CATALOG = [
+    { id: 'sportzfy-live', name: 'SportzFY Feed', group: 'Sports', type: 'feed',
+      api: 'https://raw.githubusercontent.com/smtpatel9211/2026/refs/heads/main/com.SportzFY.SportzFYLiveFootballTVApp', field: 'livetv' },
     { id: "apple-bipbop", name: "Apple BipBop (fMP4)", group: "Test", type: "direct",
       link: "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_fmp4/master.m3u8" },
     { id: "mux-test", name: "Mux Test Stream", group: "Test", type: "direct",
@@ -270,7 +271,47 @@ const DEMO_CATALOG = [
       key: "args.server_key", template: "https://{key}/x36xhzz/x36xhzz.m3u8" }
 ];
 
+// Recovered from res/xml/remote_config_defaults.xml in CRICFy_v7.2.apk.
+// Firebase Remote Config can replace this host at runtime.
+const CRICFY_DEFAULT_CATALOG = 'https://cfygsjsgdj141.top/categories/sports.txt';
+const sourceCache = new Map();
+
+function normalizeCatalog(catalog, base) {
+    if (!Array.isArray(catalog)) throw new Error('Catalog must return a JSON array');
+    return catalog.filter(channel => channel && channel.id != null).map(channel => {
+        if (!Array.isArray(channel.formats)) return { ...channel, id: String(channel.id) };
+        return {
+            id: 'cricfy:' + channel.id, name: channel.title, logo: channel.image,
+            group: channel.cat || 'Sports', type: 'chain',
+            resolvers: channel.formats.filter(format => format.webLink).map(format => ({
+                type: 'channel-item', api: mediaUrl(format.webLink, base), title: format.title
+            }))
+        };
+    }).filter(channel => channel.id && channel.name);
+}
+
+function apkStream(stream, base) {
+    if (stream.drmType || stream.drmLicense) throw new Error('DRM stream requires a compatible licensed player');
+    const type = Number(stream.type || 0);
+    const common = { headers: stream.headers, requestHeaders: stream.headers };
+    if (type === 9) return { ...common, type: 'premium', id: String(stream.link), channelId: String(stream.link) };
+    if (type === 6) return { ...common, type: 'api', api: mediaUrl(stream.api, base), link: mediaUrl(stream.link, base) };
+    if ([1, 2, 3].includes(type)) return { ...common, type: 'suffix', variant: type, link: stream.link, api: mediaUrl(stream.api, base) };
+    if ([4, 5].includes(type)) return { ...common, type: 'sniff', link: mediaUrl(stream.link, type === 5 ? 'https://vk.com/' : base) };
+    if (type === 0) return { ...common, type: 'direct', link: mediaUrl(stream.link, base) };
+    throw new Error('Unsupported APK stream type: ' + type);
+}
+
+// wn2.e: reverse the suffix, remove the inserted characters, then reverse back.
+function decodeApkSuffix(value, variant) {
+    const reversed = [...value].reverse();
+    const positions = variant === 1 ? [10, 22, 34, 46, 58] : [33, 42, 51, 58];
+    if (value.length < 59) throw new Error('Malformed APK suffix');
+    return reversed.filter((_, index) => !positions.includes(index)).reverse().join('');
+}
+
 const JSON_CORS = {
+    'Cache-Control': 'no-store',
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
@@ -283,41 +324,202 @@ function getByPath(obj, path) {
 }
 
 // Resolve one channel to { url, headers } by its type (the core app pattern)
-async function resolveChannel(ch) {
-    const headers = ch.headers || {};
+function mediaUrl(value, base) {
+    if (typeof value !== 'string' || !value.trim()) throw new Error('missing URL');
+    const url = new URL(value, base);
+    if (!['http:', 'https:'].includes(url.protocol)) throw new Error('URL must use HTTP or HTTPS');
+    return url.href;
+}
+
+function normalizeHeaders(input = {}) {
+    const out = {};
+    for (const [key, value] of Object.entries(input || {})) {
+        const name = { referer: 'referer', referrer: 'referer', origin: 'origin', 'user-agent': 'userAgent', useragent: 'userAgent' }[key.toLowerCase()];
+        if (name && typeof value === 'string') out[name] = value;
+    }
+    return out;
+}
+
+async function resolverFetch(url, overrides, signal) {
+    const h = normalizeHeaders(overrides);
+    const headers = new Headers();
+    if (h.referer) headers.set('Referer', h.referer);
+    if (h.origin) headers.set('Origin', h.origin);
+    headers.set('User-Agent', h.userAgent || 'Mozilla/5.0');
+    const timeout = AbortSignal.timeout(10000);
+    const response = await fetch(mediaUrl(url), { headers, redirect: 'follow', signal: signal ? AbortSignal.any([signal, timeout]) : timeout });
+    if (!response.ok) throw new Error('Upstream HTTP ' + response.status);
+    return response;
+}
+
+// Static extraction only: never execute untrusted scripts in the Worker.
+function sniffCandidates(text, base) {
+    const found = new Set();
+    const decoded = text.replace(/\\\//g, '/').replace(/\\u002[fF]/g, '/').replace(/\\u0026/g, '&').replace(/&amp;|&#38;/g, '&').replace(/&quot;/g, '"');
+    const add = value => { try { found.add(mediaUrl(value, base)); } catch (_) {} };
+    for (const m of decoded.matchAll(/(?:https?:)?\/\/[^\s"'<>\\]+\.m3u8[^\s"'<>\\]*/gi)) add(m[0]);
+    for (const m of decoded.matchAll(/data-(?:hls|m3u8|source|stream)\s*=\s*["']([^"']+)["']/gi)) add(m[1]);
+    for (const m of decoded.matchAll(/(?:["'](?:file|src|hls|hls_ondemand|hlsManifestUrl|m3u8)["']|\b(?:file|src|hls|hls_ondemand|hlsManifestUrl|m3u8))\s*[:=]\s*["']([^"']+)["']/gi)) {
+        if (/\.m3u8(?:[?#]|$)/i.test(m[1])) add(m[1]);
+    }
+    for (const m of decoded.matchAll(/["']([A-Za-z0-9+/]{16,}={0,2})["']/g)) {
+        try { const value = atob(m[1]); if (/\.m3u8(?:[?#]|$)/i.test(value)) add(value); } catch (_) {}
+    }
+    return [...found];
+}
+
+async function sniffStream(ch, depth = 0) {
+    const signal = ch._signal || AbortSignal.timeout(5000);
+    const link = mediaUrl(ch.link);
+    const response = await resolverFetch(link, ch.requestHeaders || ch.headers, signal);
+    const base = response.url || link;
+    const text = await response.text();
+    const headers = normalizeHeaders({ referer: base, origin: new URL(base).origin, ...normalizeHeaders(ch.headers) });
+    if (text.trimStart().startsWith('#EXTM3U')) return { url: base, headers };
+    for (const candidate of sniffCandidates(text, base).slice(0, 8)) {
+        try {
+            const manifest = await resolverFetch(candidate, headers, signal);
+            if ((await manifest.text()).trimStart().startsWith('#EXTM3U')) return { url: manifest.url || candidate, headers };
+        } catch (_) { /* try the next candidate */ }
+    }
+    if (depth < 2) {
+        const frames = [...text.matchAll(/<iframe\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/gi),
+            ...text.matchAll(/itemprop\s*=\s*["']embedUrl["']\s+(?:href|content)\s*=\s*["']([^"']+)["']/gi)].slice(0, 3);
+        for (const frame of frames) {
+            try { return await sniffStream({ link: mediaUrl(frame[1].replace(/&amp;/g, '&'), base), requestHeaders: headers, headers: ch.headers, _signal: signal }, depth + 1); }
+            catch (_) { /* try the next frame */ }
+        }
+    }
+    throw new Error('No playable M3U8 found; this page may require browser execution');
+}
+
+async function discoverStream(ch, env) {
+    try { return await sniffStream(ch); }
+    catch (error) {
+        if (!env?.DYNAMIC_SNIFFER && !env?.DYNAMIC_SNIFFER_URL) throw error;
+        const target = env.DYNAMIC_SNIFFER ? 'https://sniffer.internal/sniff' : mediaUrl(env.DYNAMIC_SNIFFER_URL);
+        const options = {
+            method: 'POST', headers: { 'Content-Type': 'application/json',
+                Authorization: 'Bearer ' + (env.DYNAMIC_SNIFFER_TOKEN || '') },
+            body: JSON.stringify({ url: mediaUrl(ch.link), headers: normalizeHeaders(ch.headers) }),
+            signal: AbortSignal.timeout(15000)
+        };
+        const response = env.DYNAMIC_SNIFFER
+            ? await env.DYNAMIC_SNIFFER.fetch(new Request(target, options))
+            : await fetch(target, options);
+        const result = await response.json();
+        if (!response.ok || result.error) throw new Error(result.error || 'Browser sniffer HTTP ' + response.status);
+        return { url: mediaUrl(result.url), headers: normalizeHeaders(result.headers) };
+    }
+}
+
+async function resolveChannel(ch, depth = 0, env) {
+    if (depth > 5) throw new Error('resolver chain too deep');
+    if (Array.isArray(ch.resolvers)) {
+        const errors = [];
+        for (const resolver of ch.resolvers) {
+            try { return await resolveChannel({ ...ch, resolvers: null, ...resolver }, depth + 1, env); }
+            catch (e) { errors.push(e.message); }
+        }
+        throw new Error('All resolvers failed: ' + errors.join('; '));
+    }
+    if (ch.type === 'channel-item') {
+        const response = await resolverFetch(ch.api, ch.requestHeaders || ch.headers);
+        const item = await response.json();
+        if (!Array.isArray(item.streamUrls) || !item.streamUrls.length) throw new Error('ChannelItem has no streamUrls');
+        const errors = [];
+        for (const stream of item.streamUrls) {
+            try { return await resolveChannel(apkStream(stream, response.url || ch.api), depth + 1, env); }
+            catch (e) { errors.push(e.message); }
+        }
+        throw new Error('ChannelItem resolvers failed: ' + errors.join('; '));
+    }
+    if (ch.type === 'suffix') {
+        const suffix = await (await resolverFetch(ch.api, ch.requestHeaders || ch.headers)).text();
+        return { url: mediaUrl(ch.link + (ch.variant === 2 ? suffix : decodeApkSuffix(suffix, ch.variant))), headers: normalizeHeaders(ch.headers) };
+    }
+    if (ch.type === 'premium') {
+        const id = String(ch.channelId || ch.id).replace(/^premium/, '');
+        if (!/^\d+$/.test(id)) throw new Error('premium channelId must be numeric');
+        return resolveChannel({
+            ...ch, type: 'lookup',
+            api: 'https://dokoplay.xyz/server_lookup.php?channel_id=premium' + id,
+            requestHeaders: { referer: 'https://dokoplay.xyz/', userAgent: 'Mozilla/5.0', ...ch.requestHeaders },
+            template: 'https://{key}new.newkso.ru/{key}/premium' + id + '/mono.m3u8',
+            headers: { referer: 'https://newembedplay.xyz', origin: 'https://newembedplay.xyz', userAgent: 'Mozilla/5.0 (Linux; Android 13; 22101316I) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.6261.105 Mobile Safari/537.36', ...normalizeHeaders(ch.headers) }
+        }, depth + 1, env);
+    }
+    if (ch.type === 'sniff' || ch.type === 'embed') return discoverStream(ch, env);
+    if (ch.type === 'feed') {
+        const config = await (await resolverFetch(ch.api, ch.requestHeaders)).json();
+        const link = mediaUrl(getByPath(config, ch.field || 'livetv'), ch.api);
+        try { return await discoverStream({ ...ch, type: 'sniff', link }, env); }
+        catch (error) {
+            if (ch.embedFallback === false) throw error;
+            return { url: link, type: 'web', headers: {}, message: 'Feed page; no static HLS manifest found' };
+        }
+    }
+    const headers = normalizeHeaders(ch.headers);
     if (!ch.type || ch.type === 'direct') {
-        return { url: ch.link, headers };
+        return { url: mediaUrl(ch.link), headers };
     }
     if (ch.type === 'api') {
         const apiUrl = (ch.api || '').includes('%s')
-            ? ch.api.replace('%s', String(ch.link || '').split('/').pop())
+            ? ch.api.replace('%s', encodeURIComponent(new URL(ch.link).pathname.split('/').filter(Boolean).pop() || ''))
             : ch.api;
-        const j = await (await fetch(apiUrl)).json();
+        const j = await (await resolverFetch(apiUrl, ch.requestHeaders || ch.headers)).json();
         const url = getByPath(j, ch.field || 'playback_url');
         if (!url) throw new Error('playback field not found: ' + (ch.field || 'playback_url'));
-        return { url, headers };
+        return { url: mediaUrl(url, apiUrl), headers };
     }
     if (ch.type === 'lookup') {
-        const j = await (await fetch(ch.api)).json();
+        const j = await (await resolverFetch(ch.api, ch.requestHeaders || ch.headers)).json();
         const keyVal = getByPath(j, ch.key || 'server_key');
         if (keyVal == null) throw new Error('lookup key not found: ' + (ch.key || 'server_key'));
+        if (!/^[a-zA-Z0-9.-]+$/.test(String(keyVal))) throw new Error('invalid server key');
         const url = String(ch.template || '').replace(/\{key\}/g, keyVal).replace(/\{id\}/g, ch.id);
-        return { url, headers };
+        return { url: mediaUrl(url), headers };
     }
     throw new Error('unknown channel type: ' + ch.type);
 }
 
 async function loadCatalog(env) {
     if (env && env.CATALOG_URL) {
-        try { return await (await fetch(env.CATALOG_URL)).json(); } catch (e) { /* fall back to demo */ }
+        const catalog = await (await resolverFetch(env.CATALOG_URL)).json();
+        return normalizeCatalog(catalog, env.CATALOG_URL);
     }
-    return DEMO_CATALOG;
+    const catalog = DEMO_CATALOG.map(channel => channel.type === 'feed' ? {
+        ...channel, api: env?.SPORTZ_CONFIG_URL || channel.api, field: env?.SPORTZ_FEED_FIELD || channel.field
+    } : channel);
+    if (env?.CRICFY_ENABLED === 'false') return catalog;
+    const source = await loadCricfySource(env);
+    return [...catalog, ...source.channels];
+}
+
+async function loadCricfySource(env) {
+    const url = env?.CRICFY_CATALOG_URL || CRICFY_DEFAULT_CATALOG;
+    const cached = sourceCache.get(url);
+    if (cached && cached.expires > Date.now()) return cached.promise;
+    const promise = (async () => {
+        try {
+            const channels = normalizeCatalog(await (await resolverFetch(url)).json(), url);
+            return { id: 'cricfy', url, status: 'available', channels, count: channels.length };
+        } catch (e) {
+            const previous = cached ? await cached.promise : null;
+            const channels = previous?.channels || [];
+            return { id: 'cricfy', url, status: channels.length ? 'stale' : 'unavailable', channels, count: channels.length, message: e.message };
+        }
+    })();
+    // Cache both success and failure to avoid repeating dead-host requests on every play.
+    if (sourceCache.size >= 8) sourceCache.delete(sourceCache.keys().next().value);
+    sourceCache.set(url, { promise, expires: Date.now() + 60000 });
+    return promise;
 }
 
 // GET /catalog  -> public channel list (no internal api/template fields leaked)
 async function handleCatalog(env) {
     const cat = await loadCatalog(env);
-    const pub = cat.map(c => ({ id: c.id, name: c.name, group: c.group || '', type: c.type || 'direct' }));
+    const pub = cat.map(c => ({ id: c.id, name: c.name, logo: c.logo || '', group: c.group || '', type: c.type || 'direct' }));
     return new Response(JSON.stringify(pub), { headers: JSON_CORS });
 }
 
@@ -328,20 +530,43 @@ async function handleResolve(request, env) {
     const ch = cat.find(c => c.id === id);
     if (!ch) return new Response(JSON.stringify({ error: 'unknown channel id', id }), { status: 404, headers: JSON_CORS });
     try {
-        return new Response(JSON.stringify(await resolveChannel(ch)), { headers: JSON_CORS });
+        return new Response(JSON.stringify(await resolveChannel(ch, 0, env)), { headers: JSON_CORS });
     } catch (e) {
         return new Response(JSON.stringify({ error: 'resolve failed', message: e.message, id }), { status: 502, headers: JSON_CORS });
     }
 }
 
-// Router: /catalog and /resolve go to the resolver; everything else is the proxy
+// Resolver endpoints share JSON error handling; all other requests use the proxy.
 async function handleRequest(request, env) {
     const path = new URL(request.url).pathname;
-    if (request.method === 'OPTIONS' && (path.endsWith('/catalog') || path.endsWith('/resolve'))) {
-        return new Response(null, { status: 204, headers: JSON_CORS });
+    const resolverRoute = ['/catalog', '/resolve', '/sniff', '/feed', '/sources'].includes(path);
+    if (resolverRoute && !['GET', 'OPTIONS'].includes(request.method)) {
+        return new Response(JSON.stringify({ error: 'method not allowed' }), { status: 405, headers: { ...JSON_CORS, Allow: 'GET, OPTIONS' } });
     }
-    if (path.endsWith('/catalog')) return handleCatalog(env);
-    if (path.endsWith('/resolve')) return handleResolve(request, env);
+    if (resolverRoute && request.method === 'OPTIONS') return new Response(null, { status: 204, headers: JSON_CORS });
+    try {
+        if (path === '/sources') {
+            const sniffer = { id: 'sniffer', status: env?.DYNAMIC_SNIFFER || env?.DYNAMIC_SNIFFER_URL ? 'configured' : 'not configured' };
+            if (env?.CRICFY_ENABLED === 'false') return new Response(JSON.stringify([{ id: 'cricfy', status: 'disabled', count: 0 }, sniffer]), { headers: JSON_CORS });
+            const source = await loadCricfySource(env);
+            const { channels, ...status } = source;
+            return new Response(JSON.stringify([status, sniffer]), { headers: JSON_CORS });
+        }
+        if (path === '/sniff') {
+            const link = new URL(request.url).searchParams.get('url');
+            return new Response(JSON.stringify(await discoverStream({ link }, env)), { headers: JSON_CORS });
+        }
+        if (path === '/feed') {
+            const configUrl = env?.SPORTZ_CONFIG_URL || 'https://raw.githubusercontent.com/smtpatel9211/2026/refs/heads/main/com.SportzFY.SportzFYLiveFootballTVApp';
+            const config = await (await resolverFetch(configUrl)).json();
+            const url = mediaUrl(getByPath(config, env?.SPORTZ_FEED_FIELD || 'livetv'), configUrl);
+            return new Response(JSON.stringify({ url, type: 'embed' }), { headers: JSON_CORS });
+        }
+        if (path === '/catalog') return await handleCatalog(env);
+        if (path === '/resolve') return await handleResolve(request, env);
+    } catch (e) {
+        return new Response(JSON.stringify({ error: 'resolver request failed', message: e.message }), { status: 502, headers: JSON_CORS });
+    }
     return handleProxyRequest(request);
 }
 

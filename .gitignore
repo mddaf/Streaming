@@ -14,3 +14,11 @@ Thumbs.db
 # Local analysis material: never part of the website
 reverse-engineering/
 apks/
+APK_ANALYSIS.md
+tools/node_modules/
+tools/.wrangler/
+tools/.deploy-build/
+.dev.vars
+.dev.vars.*
+.env
+.env.*

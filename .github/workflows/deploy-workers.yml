@@ -1,0 +1,53 @@
+name: Validate and deploy streaming Workers
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - cloudflare_worker.js
+      - js/**
+      - tools/**
+      - tests/**
+      - .github/workflows/deploy-workers.yml
+  pull_request:
+    paths:
+      - cloudflare_worker.js
+      - js/**
+      - tools/**
+      - tests/**
+      - .github/workflows/deploy-workers.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: streaming-workers-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: tools/package-lock.json
+      - run: npm ci --prefix tools --ignore-scripts
+      - name: Test resolver, player and Cloudflare capture behavior
+        run: node --test tests/resolver.test.cjs tests/playback.test.cjs tools/cloudflare-sniffer.test.mjs
+      - name: Validate both deployment bundles
+        run: npm run check:deploy --prefix tools
+      - name: Deploy on main when account secrets are configured
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            npm run deploy --prefix tools
+          else
+            echo '::notice::Deployment skipped. Add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID repository secrets to enable automatic deployment.'
+          fi

@@ -1,0 +1,17 @@
+{
+  "name": "streampulse-browser-sniffer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node browser-sniffer.mjs",
+    "deploy": "node deploy.mjs",
+    "check:deploy": "node deploy.mjs --dry-run"
+  },
+  "dependencies": {
+    "playwright-core": "^1.65.0"
+  },
+  "devDependencies": {
+    "@cloudflare/puppeteer": "^2.0.0",
+    "wrangler": "^4.160.1"
+  }
+}
