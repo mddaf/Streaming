@@ -1099,6 +1099,9 @@
         const currentServer = servers[serverIndex] || servers[0];
         const streamUrl = playback ? playback.url : currentServer.url;
         state.activePlaybackUrl = /^https?:\/\//i.test(streamUrl || '') ? streamUrl : null;
+        const isLocalStream = !!window.SmartProxyEngine?.isPrivateUrl?.(streamUrl);
+        const localHelp = document.getElementById('local-network-help');
+        if (localHelp) localHelp.hidden = !isLocalStream;
 
         elements.currentStreamUrlBadge.textContent = streamUrl ? streamUrl.split('/')[2] || 'Stream Host' : '';
         elements.currentStreamUrlBadge.title = streamUrl || '';
@@ -1216,7 +1219,7 @@
         elements.video.style.display = 'block';
 
         if (window.SmartProxyEngine) window.SmartProxyEngine.setStreamHeaders(playback?.headers || currentServer.headers || channel.headers);
-        const needProxy = forceProxy || (window.SmartProxyEngine && window.SmartProxyEngine.shouldRouteThroughProxy(streamUrl));
+        const needProxy = !isLocalStream && (forceProxy || (window.SmartProxyEngine && window.SmartProxyEngine.shouldRouteThroughProxy(streamUrl)));
 
         // Update routing badge
         elements.routingBadge.innerHTML = needProxy 
@@ -1305,6 +1308,11 @@
                     }
 
                     // Detect HTTP error code from HLS error data
+                    if (isLocalStream) {
+                        elements.currentChannelStatus.textContent = 'Local stream unavailable. Check network access and browser permissions below, then tap Reload.';
+                        if (localHelp) localHelp.open = true;
+                        return;
+                    }
                     const httpCode = data.response && data.response.code ? data.response.code : 0;
                     const isDeadLink = httpCode === 404 || httpCode === 410;
                     const isGeoBlocked = httpCode === 403 || httpCode === 451;
@@ -1371,6 +1379,12 @@
             };
 
             elements.video.onerror = () => {
+                if (requestId !== state.playbackRequest) return;
+                if (isLocalStream) {
+                    elements.currentChannelStatus.textContent = 'Local stream unavailable. Check network access and browser permissions below, then tap Reload.';
+                    if (localHelp) localHelp.open = true;
+                    return;
+                }
                 if (!needProxy) {
                     playChannel(channel, serverIndex, true, 0);
                 } else if (servers.length > serverIndex + 1) {

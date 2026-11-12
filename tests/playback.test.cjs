@@ -71,6 +71,36 @@ test('headerless catalog HLS uses direct-first routing', async () => {
     assert.equal(nodes.get('main-video').src, 'https://cdn.test/public.m3u8');
 });
 
+test('a local stream shows permission help and never falls back to a cloud proxy', () => {
+    const { playChannel, engine, nodes } = app();
+    engine.isPrivateUrl = url => url.startsWith('http://192.168.');
+    engine.shouldRouteThroughProxy = () => true;
+    const url = 'http://192.168.1.20/live.m3u8';
+    playChannel({ name: 'Local TV', url }, 0, true);
+    assert.equal(nodes.get('main-video').src, url);
+    assert.equal(nodes.get('local-network-help').hidden, false);
+    nodes.get('main-video').onerror();
+    assert.equal(nodes.get('main-video').src, url);
+    assert.equal(nodes.get('local-network-help').open, true);
+    assert.match(nodes.get('current-channel-status').textContent, /browser permissions/);
+    playChannel({ name: 'Public TV', url: 'https://cdn.test/live.m3u8' });
+    assert.equal(nodes.get('local-network-help').hidden, true);
+});
+
+test('local IPv4, IPv6 and mDNS hosts stay direct even in forced proxy mode', () => {
+    const context = vm.createContext({ window: {}, URL, localStorage: { getItem() {} } });
+    vm.runInContext(fs.readFileSync('js/proxy-loader.js', 'utf8'), context);
+    const engine = context.window.SmartProxyEngine;
+    engine.CONFIG.currentMode = 'proxy';
+    for (const host of ['192.168.1.20', '10.1.2.3', '172.31.1.2', '127.0.0.1', '169.254.1.1', '[::1]', '[fd00::1]', '[fe80::1]', 'tv.local', 'localhost']) {
+        const url = 'http://' + host + '/live.m3u8';
+        assert.equal(engine.isPrivateUrl(url), true, host);
+        assert.equal(engine.shouldRouteThroughProxy(url, true), false, host);
+    }
+    assert.equal(engine.isPrivateUrl('https://cdn10.example.com/192.168.1.20/live.m3u8'), false);
+    assert.equal(engine.shouldRouteThroughProxy('https://cdn.test/live.m3u8', true), true);
+});
+
 test('web feed discovery falls back to its iframe on static sniff failure', async () => {
     const { playChannel, pending, nodes } = app();
     const channel = { name: 'Embed', type: 'web', url: 'https://embed.test/' };

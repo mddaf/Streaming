@@ -148,6 +148,12 @@
 
                 <!-- Stream error banner (filled by app.js) -->
                 <div class="geo-alert-banner" id="geo-alert-banner"></div>
+                <details id="local-network-help" hidden>
+                    <summary>Local-network playback and permissions</summary>
+                    <p>This stream connects to a server on your local or ISP network. Join the Wi-Fi or ISP network that provides it. If your browser asks for local-network access, choose Allow to connect.</p>
+                    <p>No prompt? Check this website's permissions in your browser settings and your browser's permissions in phone settings, if available. After changing a setting, tap Reload above to retry. Some browsers do not offer this permission.</p>
+                    <p>Permission alone cannot fix an unreachable server, an HTTP stream blocked by an HTTPS page, or missing CORS support. You can also use the player's open-in-new-window button to open the stream directly. The website cannot accept browser permissions for you.</p>
+                </details>
 
                 <!-- Now playing + stats drawer -->
                 <div class="channel-meta-section">
@@ -324,6 +330,11 @@
             </div>
             <div class="modal-body">
                 <p class="modal-lead">Choose how streams reach your browser:</p>
+                <details>
+                    <summary>Local-network permission on phones and computers</summary>
+                    <p>Only local or ISP-network streams need local-network access. Your browser decides whether to display a permission prompt when you play one. If access was blocked, check this website's browser permissions and your phone's app permissions, then reload the stream. The website cannot force a prompt or accept it automatically.</p>
+                    <p>Local servers must be reachable from your current network. Cloud proxies cannot connect to a server on your home network.</p>
+                </details>
                 <div class="option-list">
                     <button type="button" class="routing-option-btn" data-mode="auto">
                         <span class="option-title">Smart auto <span class="option-note">recommended</span></span>
@@ -433,8 +444,8 @@
 
     <!-- Scripts. hls.js is served from this site (pinned 1.7.4), so playback does not depend on a third-party CDN being reachable. -->
     <script src="js/vendor/hls.min.js?v=1.7.4"></script>
-    <script src="js/proxy-loader.js?v=9"></script>
+    <script src="js/proxy-loader.js?v=10"></script>
     <script src="js/health-checker.js?v=8"></script>
-    <script src="js/app.js?v=10"></script>
+    <script src="js/app.js?v=11"></script>
 </body>
 </html>

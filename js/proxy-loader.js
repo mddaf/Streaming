@@ -113,7 +113,10 @@ function buildProxyUrl(rawUrl, proxyIndex = null, headers = null) {
 function isPrivateUrl(url) {
     let host;
     try { host = new URL(url).hostname; } catch (e) { return false; }
-    return /^(localhost$|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host);
+    host = host.toLowerCase().replace(/^\[|\]$/g, '');
+    return /(^|\.)(localhost|local)$/.test(host)
+        || /^(127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host)
+        || host === '::1' || /^(f[cd][0-9a-f]{2}|fe[89ab][0-9a-f]):/i.test(host);
 }
 
 /**
@@ -121,11 +124,12 @@ function isPrivateUrl(url) {
  */
 function shouldRouteThroughProxy(url, forceProxy = false) {
     if (!url) return false;
+    // A cloud proxy cannot reach the viewer's LAN, including in forced proxy mode.
+    if (isPrivateUrl(url)) return false;
     if (forceProxy || PROXY_CONFIG.currentMode === 'proxy') return true;
     if (PROXY_CONFIG.currentMode === 'direct') return false;
 
     // Private / local networks cannot be reached by a cloud proxy: connect directly.
-    if (isPrivateUrl(url)) return false;
 
     // In 'auto' mode https streams are tried directly first (works where the proxy is blocked or
     // rate-limited, and uses the viewer's own region); app.js falls back to the proxy on the

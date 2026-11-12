@@ -59,6 +59,16 @@ test('real website refreshes its guide while its resolved embed keeps playing', 
         await page.getByText(name, { exact: true }).first().waitFor();
         assert.equal(await page.evaluate(() => window.fixtureFrame === document.querySelector('#sports-iframe').contentWindow), true);
         assert.equal(await page.locator('#sports-iframe').getAttribute('src'), base + '/fixture-player');
+        // The explanatory UI is available on narrow screens without relying on a browser permission API.
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.locator('#tab-custom').click();
+        await page.locator('#custom-url-input').fill('http://192.168.1.20/live.m3u8');
+        await page.locator('#save-custom-btn').click();
+        const localHelp = page.locator('#local-network-help');
+        assert.equal(await localHelp.isVisible(), true);
+        if (await localHelp.getAttribute('open') === null) await localHelp.locator('summary').click();
+        assert.equal(await localHelp.getAttribute('open') !== null, true);
+        assert.match(await localHelp.innerText(), /website cannot accept browser permissions/);
         assert.deepEqual(errors, []);
     } finally {
         if (browser) await browser.close();
