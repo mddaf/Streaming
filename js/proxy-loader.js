@@ -107,6 +107,16 @@ function buildProxyUrl(rawUrl, proxyIndex = null, headers = null) {
 }
 
 /**
+ * True when the URL's HOST is on a private network (10/8, 172.16/12, 192.168/16, loopback).
+ * Tests the hostname only: a substring test on the whole URL misfires on e.g. "cdn10.example.com".
+ */
+function isPrivateUrl(url) {
+    let host;
+    try { host = new URL(url).hostname; } catch (e) { return false; }
+    return /^(localhost$|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host);
+}
+
+/**
  * Determine whether a given URL should go through the proxy based on routing mode and protocol
  */
 function shouldRouteThroughProxy(url, forceProxy = false) {
@@ -114,14 +124,13 @@ function shouldRouteThroughProxy(url, forceProxy = false) {
     if (forceProxy || PROXY_CONFIG.currentMode === 'proxy') return true;
     if (PROXY_CONFIG.currentMode === 'direct') return false;
 
-    // Private / Local ISP networks (172.16.x.x, 192.168.x.x, 10.x.x.x, localhost)
-    // cannot be reached by cloud proxies (Cloudflare Workers). Connect to them directly!
-    if (url.includes('172.16.') || url.includes('192.168.') || url.includes('10.') || url.includes('localhost') || url.includes('127.0.0.1')) {
-        return false;
-    }
+    // Private / local networks cannot be reached by a cloud proxy: connect directly.
+    if (isPrivateUrl(url)) return false;
 
-    // In 'auto' mode: route public streams through proxy
-    return true;
+    // In 'auto' mode https streams are tried directly first (works where the proxy is blocked or
+    // rate-limited, and uses the viewer's own region); app.js falls back to the proxy on the
+    // first failure. http streams must be proxied: an https page cannot load them.
+    return !/^https:/i.test(url);
 }
 
 /**
@@ -240,6 +249,7 @@ window.SmartProxyEngine = {
     unwrapProxyUrl,
     buildProxyUrl,
     shouldRouteThroughProxy,
+    isPrivateUrl,
     resolveM3u8RelativeUrls,
     createSmartProxyLoader
 };

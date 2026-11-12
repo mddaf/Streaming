@@ -3,188 +3,157 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0C1016">
     <title>StreamPulse - Ultra Modern IPTV & Multi-Source Live Streaming Player</title>
     <meta name="description" content="Next-generation IPTV and live streaming web player with Multi-Source playlist aggregation, Geo-bypass smart routing, CORS proxy fallback, and real-time channel availability health checks.">
-    
-    <!-- Google Fonts & Stylesheet -->
+
+    <!-- Web fonts load without blocking first paint: if Google Fonts is slow or unreachable
+         on this network the page still renders at once in the system font. -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=5">
-
-    <!-- Hls.js Media Engine -->
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="css/app.css?v=6">
 </head>
 <body>
 
     <div id="app-container">
-        <!-- Top Navbar -->
+        <!-- Top bar -->
         <header class="navbar">
-            <a href="#" class="nav-brand" id="brand-link">
+            <a href="#" class="nav-brand" id="brand-link" aria-label="StreamPulse">
                 <div class="brand-icon-wrapper">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <polygon points="5 3 19 12 5 21 5 3"></polygon>
                     </svg>
                 </div>
-                <div>
+                <div class="brand-name">
                     <span class="brand-text">StreamPulse</span>
                     <span class="brand-tag">PRO</span>
                 </div>
             </a>
 
-            <!-- Global Quick Search -->
+            <!-- Search -->
             <div class="search-wrapper">
-                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <circle cx="11" cy="11" r="8"></circle>
                     <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                 </svg>
-                <input type="text" id="search-input" class="search-input" placeholder="Search channels, sports, news, movies..." autocomplete="off" spellcheck="false">
-                <button type="button" id="search-clear-btn" class="search-clear-btn" title="Clear search">&times;</button>
-                <span class="search-shortcut">/</span>
+                <input type="text" id="search-input" class="search-input" placeholder="Search channels" aria-label="Search channels" enterkeyhint="search" autocomplete="off" spellcheck="false">
+                <button type="button" id="search-clear-btn" class="search-clear-btn" title="Clear search" aria-label="Clear search">&times;</button>
+                <span class="search-shortcut" aria-hidden="true">/</span>
             </div>
 
-            <!-- Navigation Tabs & Source Manager -->
-            <nav class="nav-tabs">
-                <button type="button" class="nav-tab-btn active" data-tab="channels" id="tab-channels">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>
+            <!-- Sections (views of the guide) and tools. On phones this becomes the bottom bar. -->
+            <nav class="nav-tabs" aria-label="Sections">
+                <button type="button" class="nav-tab-btn active" data-tab="channels" id="tab-channels" title="All channels">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>
                     <span>Channels</span>
                 </button>
-                <button type="button" class="nav-tab-btn" data-tab="sports" id="tab-sports">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path></svg>
-                    <span>Sports Arena</span>
+                <button type="button" class="nav-tab-btn" data-tab="sports" id="tab-sports" title="Sports arena">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8"></path><path d="M12 17v4"></path><path d="M7 4h10v5a5 5 0 0 1-10 0V4z"></path><path d="M17 5h3v2a3 3 0 0 1-3 3"></path><path d="M7 5H4v2a3 3 0 0 0 3 3"></path></svg>
+                    <span>Sports</span>
                 </button>
-                <button type="button" class="nav-tab-btn" data-tab="favorites" id="tab-favorites">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                <button type="button" class="nav-tab-btn" data-tab="favorites" id="tab-favorites" title="Favorites">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
                     <span>Favorites</span>
                     <span class="nav-badge" id="fav-count-badge">0</span>
                 </button>
-                <button type="button" class="nav-tab-btn" data-tab="recents" id="tab-recents">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                <button type="button" class="nav-tab-btn" data-tab="recents" id="tab-recents" title="Recently played">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                     <span>Recent</span>
                 </button>
-                <button type="button" class="nav-tab-btn" id="open-sources-btn" title="Manage & Combine Playlist URLs">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                <span class="nav-sep" aria-hidden="true"></span>
+                <button type="button" class="nav-tab-btn nav-tool" id="open-sources-btn" title="Playlist sources">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
                     <span>Sources</span>
                 </button>
-                <button type="button" class="nav-tab-btn" data-tab="custom" id="tab-custom">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                <button type="button" class="nav-tab-btn nav-tool" data-tab="custom" id="tab-custom" title="Play a stream URL">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
                     <span>Play URL</span>
                 </button>
-                <button type="button" class="nav-tab-btn" id="open-bdix-hub-btn" title="Local BDIX & FTP Hub" style="color:var(--accent-emerald);font-weight:600;">
-                    <span>⚡ BDIX & FTP Hub</span>
+                <button type="button" class="nav-tab-btn nav-tool" id="open-bdix-hub-btn" title="Local BDIX and FTP hub">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+                    <span>BDIX hub</span>
                 </button>
-                <button type="button" class="nav-tab-btn" id="open-geo-guide-btn" title="Geo-Bypass & Worker Guide" style="color:var(--accent-amber);">
-                    <span>🌍 Geo-Tips</span>
+                <button type="button" class="nav-tab-btn nav-tool" id="open-geo-guide-btn" title="When a stream is blocked">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                    <span>Geo tips</span>
                 </button>
             </nav>
         </header>
 
-        <!-- Subheader Toolbar (Category chips, hide offline toggle, stats) -->
-        <div class="toolbar-bar">
-            <div class="chips-container" id="chips-container">
-                <!-- Dynamically populated chips -->
-            </div>
-
-            <div class="toolbar-controls">
-                <!-- Hide Offline Toggle -->
-                <label class="toggle-wrapper" title="Only display streams verified as currently online">
-                    <input type="checkbox" id="hide-offline-toggle" class="toggle-input" checked>
-                    <div class="toggle-switch"></div>
-                    <span>Hide Offline</span>
-                </label>
-
-                <!-- Status Stats Badge -->
-                <div class="status-stats-badge" id="stats-badge">
-                    Checking channels...
-                </div>
-
-                <!-- View Mode Toggle -->
-                <div class="view-mode-group">
-                    <button type="button" class="view-btn active" id="view-grid-btn" title="Grid View">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-                    </button>
-                    <button type="button" class="view-btn" id="view-list-btn" title="List View">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Main Workspace Stage -->
+        <!-- Stage: player + channel guide -->
         <main class="main-stage">
-            <!-- Left / Player Pane -->
-            <section class="player-pane" id="player-pane">
+            <!-- Player -->
+            <section class="player-pane" id="player-pane" aria-label="Player">
                 <div class="video-container">
                     <video id="main-video" controls playsinline autoplay></video>
-                    <iframe id="sports-iframe" allowfullscreen scrolling="no" allow="autoplay; fullscreen; encrypted-media"></iframe>
+                    <iframe id="sports-iframe" title="Embedded live feed" allowfullscreen scrolling="no" allow="autoplay; fullscreen; encrypted-media"></iframe>
 
-                    <!-- Floating Server Switcher in the Video Player Screen (Image Area) -->
+                    <!-- Server switcher on the video (shown by app.js when a channel has mirrors) -->
                     <div class="player-screen-servers" id="player-screen-servers" style="display:none;">
-                        <span class="player-screen-servers-label">⚡ Servers:</span>
-                        <div id="player-screen-server-buttons" style="display:flex;gap:4px;"></div>
+                        <span class="player-screen-servers-label">Servers</span>
+                        <div id="player-screen-server-buttons" class="player-screen-server-buttons"></div>
                     </div>
 
-                    <!-- Top Overlay Badges -->
                     <div class="player-top-overlay">
-                        <div class="stream-status-pill" id="current-channel-status">
+                        <div class="stream-status-pill" id="current-channel-status" role="status">
                             <span class="live-pulse-dot"></span> Ready to play
                         </div>
-                        <button type="button" class="routing-mode-pill" id="routing-badge" title="Click to view routing & proxy options">
+                        <button type="button" class="routing-mode-pill" id="routing-badge" title="Routing and proxy options">
                             ⚡ Smart Auto Route
                         </button>
                     </div>
                 </div>
 
-                <!-- Player Action Toolbar -->
+                <!-- Player actions -->
                 <div class="player-action-bar">
                     <div class="action-btn-group">
-                        <button type="button" class="action-btn" id="reload-btn" title="Reload stream (R)">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                        <button type="button" class="action-btn" id="reload-btn" title="Reload stream (R)" aria-label="Reload stream">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
                             <span>Reload</span>
                         </button>
-                        <button type="button" class="action-btn" id="fav-active-btn" title="Bookmark Channel">
+                        <button type="button" class="action-btn" id="fav-active-btn" title="Add this channel to favorites">
                             ☆ Favorite
                         </button>
-                        <!-- Server / Alternate Mirror selector buttons -->
-                        <div id="player-action-server-group" style="display:none;align-items:center;gap:4px;"></div>
-                        <select id="server-select" class="action-select" style="display:none;" title="Select Alternate Server Mirror"></select>
-                        <!-- Quality selector for HLS streams -->
-                        <select id="quality-select" class="action-select" title="Resolution Quality">
+                        <!-- Alternate server buttons (filled by app.js) -->
+                        <div id="player-action-server-group" class="action-server-group" style="display:none;"></div>
+                        <select id="server-select" class="action-select" style="display:none;" title="Alternate server"></select>
+                        <select id="quality-select" class="action-select" title="Video quality" aria-label="Video quality">
                             <option value="-1">Auto (Adapt)</option>
                         </select>
                     </div>
 
                     <div class="action-btn-group">
-                        <button type="button" class="action-btn" id="diag-toggle-btn" title="Stream Tech Diagnostics">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                        <button type="button" class="action-btn" id="diag-toggle-btn" title="Stream stats" aria-label="Stream stats">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
                             <span>Stats</span>
                         </button>
-                        <button type="button" class="action-btn" id="pip-btn" title="Picture in Picture">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"></rect><rect x="12" y="10" width="8" height="8" rx="1"></rect></svg>
+                        <button type="button" class="action-btn" id="pip-btn" title="Picture in picture" aria-label="Picture in picture">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"></rect><rect x="12" y="10" width="8" height="8" rx="1"></rect></svg>
                             <span>PiP</span>
                         </button>
-                        <button type="button" class="action-btn" id="theater-btn" title="Theater Mode (T)">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"></rect><line x1="2" y1="12" x2="22" y2="12"></line></svg>
+                        <button type="button" class="action-btn" id="theater-btn" title="Theater mode (T)" aria-label="Theater mode">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"></rect></svg>
                             <span>Theater</span>
                         </button>
-                        <button type="button" class="action-btn" id="fullscreen-btn" title="Fullscreen (F)">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+                        <button type="button" class="action-btn" id="fullscreen-btn" title="Fullscreen (F)" aria-label="Fullscreen">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
                             <span>Full</span>
                         </button>
-                        <button type="button" class="action-btn" id="popout-btn" title="Pop-out in new window">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                        <button type="button" class="action-btn" id="popout-btn" title="Open the stream in a new window" aria-label="Open the stream in a new window">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
                         </button>
                     </div>
                 </div>
 
-                <!-- Geo-Restriction Alert Banner -->
+                <!-- Stream error banner (filled by app.js) -->
                 <div class="geo-alert-banner" id="geo-alert-banner"></div>
 
-                <!-- Channel Meta & Diagnostics Section -->
+                <!-- Now playing + stats drawer -->
                 <div class="channel-meta-section">
                     <div class="meta-header-row">
                         <div class="channel-brand-info">
-                            <img id="active-channel-logo" class="active-channel-logo" alt="Logo" style="display:none;">
+                            <img id="active-channel-logo" class="active-channel-logo" alt="" style="display:none;">
                             <div class="channel-title-group">
                                 <h1 id="current-channel-name">Select a Channel to Watch</h1>
                                 <div class="channel-tag-badges">
@@ -194,8 +163,7 @@
                             </div>
                         </div>
 
-                        <!-- Equalizer Animation for active audio -->
-                        <div class="equalizer-wave" title="Audio Stream">
+                        <div class="equalizer-wave" aria-hidden="true">
                             <div class="eq-bar"></div>
                             <div class="eq-bar"></div>
                             <div class="eq-bar"></div>
@@ -203,7 +171,6 @@
                         </div>
                     </div>
 
-                    <!-- Tech Specs Diagnostics Drawer -->
                     <div class="diagnostics-panel" id="diag-panel">
                         <div class="diag-grid">
                             <div class="diag-item">
@@ -231,18 +198,41 @@
                 </div>
             </section>
 
-            <!-- Right / Channels Browser Pane -->
-            <section class="channels-pane">
+            <!-- Channel guide: carries its own filters so nothing sits between the top bar and the video -->
+            <section class="channels-pane" aria-label="Channel guide">
                 <div class="channels-header">
-                    <div class="channels-header-title">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 11a9 9 0 0 1 9 9"></path><path d="M4 4a16 16 0 0 1 16 16"></path><circle cx="5" cy="19" r="1"></circle></svg>
-                        <span>Channel Guide</span>
-                    </div>
-                    <div style="display:flex;align-items:center;gap:8px;">
-                        <button type="button" class="action-btn" id="refresh-health-btn" onclick="if(window.streamHealthChecker){window.streamHealthChecker.clearCache();window.location.reload();}" title="Refresh all stream health checks">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
-                            <span>Refresh Checks</span>
+                    <h2 class="channels-header-title">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11a9 9 0 0 1 9 9"></path><path d="M4 4a16 16 0 0 1 16 16"></path><circle cx="5" cy="19" r="1"></circle></svg>
+                        <span>Channel guide</span>
+                    </h2>
+                    <div class="channels-header-actions">
+                        <div class="view-mode-group" role="group" aria-label="Guide layout">
+                            <button type="button" class="view-btn active" id="view-grid-btn" title="Grid view" aria-label="Grid view">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                            </button>
+                            <button type="button" class="view-btn" id="view-list-btn" title="List view" aria-label="List view">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                            </button>
+                        </div>
+                        <button type="button" class="icon-btn" id="refresh-health-btn" onclick="if(window.streamHealthChecker){window.streamHealthChecker.clearCache();window.location.reload();}" title="Re-check which streams are live" aria-label="Re-check which streams are live">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
                         </button>
+                    </div>
+                </div>
+
+                <div class="toolbar-bar">
+                    <div class="chips-container" id="chips-container">
+                        <!-- Filter chips rendered by app.js -->
+                    </div>
+                    <div class="toolbar-controls">
+                        <label class="toggle-wrapper" title="Only show streams verified as online">
+                            <input type="checkbox" id="hide-offline-toggle" class="toggle-input">
+                            <span class="toggle-switch"></span>
+                            <span>Hide offline</span>
+                        </label>
+                        <div class="status-stats-badge" id="stats-badge" aria-live="polite">
+                            Checking channels...
+                        </div>
                     </div>
                 </div>
 
@@ -255,110 +245,97 @@
 
     <!-- Modals -->
 
-    <!-- Multi-Source Playlist Manager Modal -->
+    <!-- Playlist sources -->
     <div id="sources-modal" class="modal-overlay">
-        <div class="modal-card" style="max-width: 600px; max-height: 85vh; display: flex; flex-direction: column;">
+        <div class="modal-card modal-md" role="dialog" aria-modal="true" aria-labelledby="sources-modal-title">
             <div class="modal-header">
                 <div>
-                    <h3 class="modal-title">📚 Playlist Sources Manager</h3>
-                    <p style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Check multiple sources to load and aggregate thousands of channels simultaneously!</p>
+                    <h3 class="modal-title" id="sources-modal-title">Playlist sources</h3>
+                    <p class="modal-subtitle">Every source below is merged into one channel guide. Add your own M3U playlist to include it.</p>
                 </div>
-                <button type="button" class="modal-close-btn">&times;</button>
-            </div>
-            
-            <div style="display:flex;gap:8px;margin-bottom:12px;">
-                <button type="button" class="action-btn" id="select-all-sources-btn" style="font-size:0.75rem;padding:5px 10px;">Select All Sources</button>
-                <button type="button" class="action-btn" id="clear-all-sources-btn" style="font-size:0.75rem;padding:5px 10px;">Reset Selection</button>
+                <button type="button" class="modal-close-btn" aria-label="Close">&times;</button>
             </div>
 
             <!-- Scrollable list of sources -->
-            <div class="modal-body" style="flex:1;overflow-y:auto;padding-right:4px;" id="sources-list-container">
+            <div class="modal-body" id="sources-list-container">
                 <!-- Sources rendered by JS -->
             </div>
 
-            <!-- Add Custom GitHub M3U URL Form -->
-            <div style="background:var(--bg-card);border:1px dashed var(--border-subtle);border-radius:var(--radius-sm);padding:12px;margin-bottom:14px;">
-                <div style="font-weight:600;font-size:0.82rem;color:var(--accent-cyan);margin-bottom:8px;">➕ Add Custom GitHub / M3U Playlist URL</div>
-                <div style="display:flex;flex-direction:column;gap:8px;">
-                    <input type="text" id="new-source-name" class="search-input" placeholder="Source Name (e.g. My GitHub TV List)" style="padding:7px 12px;font-size:0.8rem;">
-                    <div style="display:flex;gap:8px;">
-                        <input type="url" id="new-source-url" class="search-input" placeholder="Raw M3U/M3U8 URL (https://raw.githubusercontent.com/.../playlist.m3u8)" style="padding:7px 12px;font-size:0.8rem;flex:1;">
-                        <button type="button" class="action-btn" id="add-custom-source-btn" style="background:var(--accent-cyan);color:#000;font-weight:700;">Add</button>
+            <div class="modal-section">
+                <div class="modal-section-title">Add a playlist</div>
+                <div class="field-stack">
+                    <input type="text" id="new-source-name" class="text-input" placeholder="Name (e.g. My playlist)" aria-label="Playlist name">
+                    <div class="field-row">
+                        <input type="url" id="new-source-url" class="text-input" placeholder="https://…/playlist.m3u" aria-label="Playlist URL" inputmode="url" autocapitalize="off" spellcheck="false">
+                        <button type="button" class="action-btn btn-primary" id="add-custom-source-btn">Add</button>
                     </div>
                 </div>
             </div>
 
             <div class="modal-actions">
-                <button type="button" class="action-btn modal-cancel-btn">Cancel</button>
-                <button type="button" class="action-btn" id="apply-sources-btn" style="background:linear-gradient(135deg, #00d2ff, #6366f1);color:#fff;font-weight:700;padding:8px 18px;">Apply & Load Merged Channels</button>
+                <button type="button" class="action-btn modal-cancel-btn">Close</button>
             </div>
         </div>
     </div>
 
     <!-- Geo-Bypass & Cloudflare Worker Guide Modal -->
     <div id="geo-guide-modal" class="modal-overlay">
-        <div class="modal-card" style="max-width: 620px; max-height: 85vh; display: flex; flex-direction: column;">
+        <div class="modal-card modal-md" role="dialog" aria-modal="true" aria-labelledby="geo-modal-title">
             <div class="modal-header">
                 <div>
-                    <h3 class="modal-title">🌍 Bypassing Location & Geo-Blocked Streams</h3>
-                    <p style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Solutions for domestic IP checks, token expirations, and referer blocks.</p>
+                    <h3 class="modal-title" id="geo-modal-title">Bypassing Location &amp; Geo-Blocked Streams</h3>
+                    <p class="modal-subtitle">Solutions for domestic IP checks, token expirations, and referer blocks.</p>
                 </div>
-                <button type="button" class="modal-close-btn">&times;</button>
+                <button type="button" class="modal-close-btn" aria-label="Close">&times;</button>
             </div>
-            <div class="modal-body" style="flex:1;overflow-y:auto;">
-                <h4 style="color:#fff;font-size:0.9rem;margin-bottom:6px;">1. Automatic Server Mirrors (Built-in)</h4>
-                <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:14px;">
-                    When you aggregate multiple sources, channels like beIN Sports, Sky Sports, or ATN Bangla have multiple mirrors. If Server 1 is location-blocked, use the <b>Server dropdown</b> in the player bar or let the auto-failover switch to Server 2/3.
+            <div class="modal-body prose">
+                <h4>1. Automatic Server Mirrors (Built-in)</h4>
+                <p>
+                    When you aggregate multiple sources, channels like beIN Sports, Sky Sports, or ATN Bangla have multiple mirrors. If Server 1 is location-blocked, use the <b>Server buttons</b> in the player bar or let the auto-failover switch to Server 2/3.
                 </p>
 
-                <h4 style="color:#fff;font-size:0.9rem;margin-bottom:6px;">2. Deploy the Geo-Bypass Cloudflare Worker Script</h4>
-                <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:8px;">
+                <h4>2. Deploy the Geo-Bypass Cloudflare Worker Script</h4>
+                <p>
                     Streams often return HTTP 403 because Cloudflare forwards your domestic IP in <code>cf-connecting-ip</code>, or rejects browser User-Agents. We created a production-ready script in <code>cloudflare_worker.js</code> that strips IP headers and emulates VLC media player!
                 </p>
                 <div class="code-preview-box" id="worker-code-box">// cloudflare_worker.js ready to deploy
 // 1. Visit dash.cloudflare.com -> Workers & Pages
 // 2. Open your worker (e.g. sports-proxy)
 // 3. Paste cloudflare_worker.js and click Deploy!</div>
-                <button type="button" class="action-btn" style="margin-top:8px;font-size:0.75rem;" onclick="navigator.clipboard.writeText(`// Refer to cloudflare_worker.js in project directory`);alert('Worker code path copied to clipboard!');">Copy Worker Instructions</button>
+                <button type="button" class="action-btn" onclick="navigator.clipboard.writeText(`// Refer to cloudflare_worker.js in project directory`);alert('Worker code path copied to clipboard!');">Copy Worker Instructions</button>
 
-                <h4 style="color:#fff;font-size:0.9rem;margin-top:16px;margin-bottom:6px;">3. Domestic-Only Verified Channels</h4>
-                <p style="font-size:0.82rem;color:var(--text-secondary);">
+                <h4>3. Domestic-Only Verified Channels</h4>
+                <p>
                     Certain national channels (e.g., local Bangladesh or Indian cable feeds) strictly require residential domestic ISP IPs. For those channels, install the free <b>Allow CORS</b> Chrome extension or use a domestic proxy/VPN.
                 </p>
             </div>
             <div class="modal-actions">
-                <button type="button" class="action-btn modal-cancel-btn">Got It</button>
+                <button type="button" class="action-btn modal-cancel-btn">Got it</button>
             </div>
         </div>
     </div>
 
-    <!-- Smart Routing Switcher Modal -->
+    <!-- Stream routing -->
     <div id="routing-modal" class="modal-overlay">
-        <div class="modal-card">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="routing-modal-title">
             <div class="modal-header">
-                <h3 class="modal-title">Smart Stream Routing</h3>
-                <button type="button" class="modal-close-btn">&times;</button>
+                <h3 class="modal-title" id="routing-modal-title">Stream routing</h3>
+                <button type="button" class="modal-close-btn" aria-label="Close">&times;</button>
             </div>
             <div class="modal-body">
-                <p style="margin-bottom:12px;">Choose how streams connect to bypass CORS and Geo-restrictions:</p>
-                <div style="display:flex;flex-direction:column;gap:10px;">
-                    <button type="button" class="action-btn routing-option-btn" data-mode="auto" style="justify-content:flex-start;padding:12px;">
-                        <div>
-                            <div style="font-weight:700;color:var(--accent-cyan);">⚡ Smart Auto (Recommended)</div>
-                            <div style="font-size:0.75rem;color:var(--text-muted);">Auto-detects HTTP/HTTPS & CORS requirements, routing seamlessly.</div>
-                        </div>
+                <p class="modal-lead">Choose how streams reach your browser:</p>
+                <div class="option-list">
+                    <button type="button" class="routing-option-btn" data-mode="auto">
+                        <span class="option-title">Smart auto <span class="option-note">recommended</span></span>
+                        <span class="option-desc">Plays secure streams directly and switches to the proxy by itself when the stream's host blocks browsers.</span>
                     </button>
-                    <button type="button" class="action-btn routing-option-btn" data-mode="proxy" style="justify-content:flex-start;padding:12px;">
-                        <div>
-                            <div style="font-weight:700;color:var(--accent-emerald);">🟢 Cloudflare Proxy Always</div>
-                            <div style="font-size:0.75rem;color:var(--text-muted);">Forces all manifest and media segments through the Cloudflare Worker proxy.</div>
-                        </div>
+                    <button type="button" class="routing-option-btn" data-mode="proxy">
+                        <span class="option-title">Always use the proxy</span>
+                        <span class="option-desc">Sends every playlist and video segment through the Cloudflare Worker proxy.</span>
                     </button>
-                    <button type="button" class="action-btn routing-option-btn" data-mode="direct" style="justify-content:flex-start;padding:12px;">
-                        <div>
-                            <div style="font-weight:700;color:#fff;">Direct Media Server</div>
-                            <div style="font-size:0.75rem;color:var(--text-muted);">Connects without proxy (requires server to allow CORS).</div>
-                        </div>
+                    <button type="button" class="routing-option-btn" data-mode="direct">
+                        <span class="option-title">Direct only</span>
+                        <span class="option-desc">Never uses a proxy. Works only when the stream's host allows browsers (CORS).</span>
                     </button>
                 </div>
             </div>
@@ -368,97 +345,96 @@
         </div>
     </div>
 
-    <!-- Custom Stream Modal -->
+    <!-- Play a custom stream -->
     <div id="custom-modal" class="modal-overlay">
-        <div class="modal-card">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="custom-modal-title">
             <div class="modal-header">
-                <h3 class="modal-title">Play Custom Stream</h3>
-                <button type="button" class="modal-close-btn">&times;</button>
+                <h3 class="modal-title" id="custom-modal-title">Play a stream URL</h3>
+                <button type="button" class="modal-close-btn" aria-label="Close">&times;</button>
             </div>
             <div class="modal-body">
-                <p style="margin-bottom:14px;">Enter any HLS (.m3u8), MP4, or live video URL:</p>
-                <div style="display:flex;flex-direction:column;gap:10px;">
-                    <input type="text" id="custom-name-input" class="search-input" placeholder="Channel Name (e.g. My Sports Stream)">
-                    <input type="url" id="custom-url-input" class="search-input" placeholder="Stream URL (https://.../playlist.m3u8)">
+                <p class="modal-lead">Paste any HLS (.m3u8), MP4, or live video URL:</p>
+                <div class="field-stack">
+                    <input type="text" id="custom-name-input" class="text-input" placeholder="Channel name (optional)" aria-label="Channel name">
+                    <input type="url" id="custom-url-input" class="text-input" placeholder="https://…/playlist.m3u8" aria-label="Stream URL" inputmode="url" autocapitalize="off" spellcheck="false">
                 </div>
             </div>
             <div class="modal-actions">
                 <button type="button" class="action-btn modal-cancel-btn">Cancel</button>
-                <button type="button" class="action-btn" id="save-custom-btn" style="background:var(--accent-cyan);color:#000;font-weight:700;">Play Stream</button>
+                <button type="button" class="action-btn btn-primary" id="save-custom-btn">Play stream</button>
             </div>
         </div>
     </div>
 
-    <!-- BDIX & Local FTP Media Hub Modal -->
+    <!-- BDIX & Local FTP Media Hub -->
     <div id="bdix-hub-modal" class="modal-overlay">
-        <div class="modal-card" style="max-width: 780px; width: 92%; max-height: 88vh; display: flex; flex-direction: column;">
+        <div class="modal-card modal-lg" role="dialog" aria-modal="true" aria-labelledby="bdix-modal-title">
             <div class="modal-header">
                 <div>
-                    <h3 class="modal-title" style="display:flex;align-items:center;gap:8px;">
-                        <span>⚡ Local BDIX &amp; FTP Media Hub</span>
-                        <span class="badge-pill" style="background:rgba(16,185,129,0.2);color:var(--accent-emerald);font-size:0.7rem;">Verified Active</span>
+                    <h3 class="modal-title" id="bdix-modal-title">
+                        Local BDIX &amp; FTP Media Hub
+                        <span class="badge-pill badge-health-online">Verified Active</span>
                     </h3>
-                    <p style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">
+                    <p class="modal-subtitle">
                         High-speed LAN (up to 1 Gbps zero-buffer) &amp; BDIX Media, Live TV, and FTP servers on your network
                     </p>
                 </div>
-                <button type="button" class="modal-close-btn">&times;</button>
+                <button type="button" class="modal-close-btn" aria-label="Close">&times;</button>
             </div>
 
-            <!-- Hub Search & Category Filter Bar -->
-            <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
-                <div class="search-wrapper" style="flex:1;min-width:220px;height:36px;">
-                    <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+            <!-- Hub search + category filter -->
+            <div class="hub-filters">
+                <div class="search-wrapper hub-search">
+                    <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <circle cx="11" cy="11" r="8"></circle>
                         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                     </svg>
-                    <input type="text" id="bdix-search-input" class="search-input" placeholder="Filter servers by name, movie, tv, ftp, games..." style="font-size:0.8rem;">
+                    <input type="text" id="bdix-search-input" class="search-input" placeholder="Filter servers" aria-label="Filter servers" autocomplete="off" spellcheck="false">
                 </div>
-                <div id="bdix-filter-chips" style="display:flex;gap:6px;flex-wrap:wrap;">
-                    <button type="button" class="action-btn active" data-bdix-cat="all" style="font-size:0.72rem;padding:4px 10px;">All</button>
-                    <button type="button" class="action-btn" data-bdix-cat="lan" style="font-size:0.72rem;padding:4px 10px;color:var(--accent-emerald);">⚡ LAN (Zero-Buffer)</button>
-                    <button type="button" class="action-btn" data-bdix-cat="ftp" style="font-size:0.72rem;padding:4px 10px;color:var(--accent-cyan);">📁 FTP Downloads</button>
-                    <button type="button" class="action-btn" data-bdix-cat="movies" style="font-size:0.72rem;padding:4px 10px;color:var(--accent-purple);">🎬 Movies &amp; OTT</button>
-                    <button type="button" class="action-btn" data-bdix-cat="tv" style="font-size:0.72rem;padding:4px 10px;color:var(--accent-amber);">📺 Live TV</button>
+                <div id="bdix-filter-chips" class="hub-chips">
+                    <button type="button" class="chip-btn active" data-bdix-cat="all">All</button>
+                    <button type="button" class="chip-btn" data-bdix-cat="lan">LAN</button>
+                    <button type="button" class="chip-btn" data-bdix-cat="ftp">FTP downloads</button>
+                    <button type="button" class="chip-btn" data-bdix-cat="movies">Movies &amp; OTT</button>
+                    <button type="button" class="chip-btn" data-bdix-cat="tv">Live TV</button>
                 </div>
             </div>
 
-            <div class="modal-body" style="flex:1;overflow-y:auto;padding-right:6px;" id="bdix-hub-body">
-                <!-- Highlight Card: Connected Local FTV Server -->
-                <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.35);border-radius:var(--radius-sm);padding:14px;margin-bottom:14px;">
-                    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
-                        <div style="display:flex;align-items:center;gap:8px;">
-                            <span class="live-pulse-dot" style="width:8px;height:8px;"></span>
-                            <span style="font-weight:700;color:var(--accent-emerald);font-size:0.95rem;">FTV Local Live TV (172.16.15.5)</span>
-                            <span class="badge-pill" style="background:rgba(16,185,129,0.25);color:var(--accent-emerald);font-size:0.68rem;">LAN 1 Gbps Direct</span>
+            <div class="modal-body" id="bdix-hub-body">
+                <!-- Highlight: the connected local FTV server -->
+                <div class="hub-highlight">
+                    <div class="hub-highlight-head">
+                        <div class="hub-highlight-title">
+                            <span class="live-pulse-dot"></span>
+                            <span>FTV Local Live TV (172.16.15.5)</span>
+                            <span class="badge-pill badge-health-online">LAN 1 Gbps Direct</span>
                         </div>
-                        <span style="font-size:0.7rem;background:rgba(16,185,129,0.2);color:var(--accent-emerald);padding:3px 10px;border-radius:10px;font-weight:700;">🟢 ACTIVE (77 Channels)</span>
+                        <span class="badge-pill badge-health-online">Active · 77 channels</span>
                     </div>
-                    <p style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:10px;line-height:1.5;">
+                    <p>
                         Directly integrated into StreamPulse. Hosts 77 live channels including <strong>TSports</strong>, Sony TEN 1-5, Star Sports 1-3 &amp; Select HD, Somoy, Maasranga, Star Jalsha, etc. with self-healing token refresh!
                     </p>
-                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                        <a href="http://172.16.15.5/" target="_blank" rel="noopener noreferrer" class="action-btn" style="text-decoration:none;font-size:0.75rem;">🌐 Open Web Portal</a>
-                        <button type="button" class="action-btn" id="refresh-ftv-btn" style="background:var(--accent-cyan);color:#000;font-weight:700;font-size:0.75rem;">🔄 Rescan FTV Channels</button>
+                    <div class="hub-highlight-actions">
+                        <a href="http://172.16.15.5/" target="_blank" rel="noopener noreferrer" class="action-btn">Open web portal</a>
+                        <button type="button" class="action-btn btn-primary" id="refresh-ftv-btn">Rescan FTV channels</button>
                     </div>
                 </div>
 
-                <!-- Dynamic Grid for all Local and BDIX Servers -->
-                <div id="bdix-cards-grid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(320px, 1fr));gap:10px;">
-                    <!-- Populated dynamically by app.js from bdix_ftp_servers.json -->
-                </div>
+                <!-- Cards for every local and BDIX server (rendered by app.js from bdix_ftp_servers.json) -->
+                <div id="bdix-cards-grid" class="hub-grid"></div>
             </div>
 
-            <div class="modal-actions" style="margin-top:12px;border-top:1px solid var(--border-subtle);padding-top:10px;">
-                <span style="margin-right:auto;font-size:0.75rem;color:var(--text-muted);align-self:center;" id="bdix-count-label">Showing all verified servers</span>
+            <div class="modal-actions">
+                <span class="modal-actions-note" id="bdix-count-label">Showing all verified servers</span>
                 <button type="button" class="action-btn modal-cancel-btn">Close</button>
             </div>
         </div>
     </div>
 
-    <!-- Scripts -->
-    <script src="js/proxy-loader.js?v=5"></script>
-    <script src="js/health-checker.js?v=5"></script>
-    <script src="js/app.js?v=5"></script>
+    <!-- Scripts. hls.js is served from this site (pinned 1.7.4), so playback does not depend on a third-party CDN being reachable. -->
+    <script src="js/vendor/hls.min.js?v=1.7.4"></script>
+    <script src="js/proxy-loader.js?v=6"></script>
+    <script src="js/health-checker.js?v=6"></script>
+    <script src="js/app.js?v=6"></script>
 </body>
 </html>

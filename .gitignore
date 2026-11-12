@@ -10,3 +10,7 @@ archive/reverse-engineering/shot_*.png
 .DS_Store
 Thumbs.db
 .playwright-mcp/
+
+# Local analysis material: never part of the website
+reverse-engineering/
+apks/

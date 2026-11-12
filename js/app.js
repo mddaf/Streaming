@@ -32,54 +32,11 @@
             defaultCategory: 'General'
         },
         {
-            name: 'IPTV-org Sports',
-            url: 'https://iptv-org.github.io/iptv/categories/sports.m3u',
-            defaultCategory: 'Sports'
-        },
-        {
-            name: 'IPTV-org News',
-            url: 'https://iptv-org.github.io/iptv/categories/news.m3u',
-            defaultCategory: 'News'
-        },
-        {
-            name: 'IPTV-org Movies',
-            url: 'https://iptv-org.github.io/iptv/categories/movies.m3u',
-            defaultCategory: 'Movies'
-        },
-        {
-            name: 'IPTV-org Entertainment',
-            url: 'https://iptv-org.github.io/iptv/categories/entertainment.m3u',
-            defaultCategory: 'Entertainment'
-        },
-        {
-            name: 'IPTV-org Documentaries',
-            url: 'https://iptv-org.github.io/iptv/categories/documentary.m3u',
-            defaultCategory: 'Documentaries'
-        },
-        {
-            name: 'IPTV-org Music',
-            url: 'https://iptv-org.github.io/iptv/categories/music.m3u',
-            defaultCategory: 'Music'
-        },
-        {
-            name: 'Bangladesh (BD)',
-            url: 'https://iptv-org.github.io/iptv/countries/bd.m3u',
-            defaultCountry: 'bd'
-        },
-        {
-            name: 'India (IN)',
-            url: 'https://iptv-org.github.io/iptv/countries/in.m3u',
-            defaultCountry: 'in'
-        },
-        {
-            name: 'United States (US)',
-            url: 'https://iptv-org.github.io/iptv/countries/us.m3u',
-            defaultCountry: 'us'
-        },
-        {
-            name: 'United Kingdom (UK)',
-            url: 'https://iptv-org.github.io/iptv/countries/uk.m3u',
-            defaultCountry: 'uk'
+            // The whole iptv-org catalogue in one request (about 11,000 public channels, maintained
+            // upstream). It is a superset of the per-category and per-country files, and every
+            // entry carries its country in tvg-id and its category in group-title.
+            name: 'IPTV-org (all countries)',
+            url: 'https://iptv-org.github.io/iptv/index.m3u'
         }
     ];
 
@@ -281,6 +238,9 @@
        Filter Chips Rendering (Restored Category & Country Filters)
        -------------------------------------------------------------------------- */
     function renderFilterChips() {
+        // keep the strip's scroll position across re-renders of the same filter mode
+        const keepScroll = elements.chipsContainer.dataset.mode === state.filterMode ? elements.chipsContainer.scrollLeft : 0;
+        elements.chipsContainer.dataset.mode = state.filterMode;
         elements.chipsContainer.innerHTML = '';
 
         if (state.activeTab === 'sports') {
@@ -300,13 +260,7 @@
 
         // Toggle Type Pills: By Category | By Country
         const filterTypeToggle = document.createElement('div');
-        filterTypeToggle.style.display = 'inline-flex';
-        filterTypeToggle.style.gap = '4px';
-        filterTypeToggle.style.marginRight = '8px';
-        filterTypeToggle.style.background = 'rgba(0,0,0,0.35)';
-        filterTypeToggle.style.padding = '2px';
-        filterTypeToggle.style.borderRadius = 'var(--radius-full)';
-        filterTypeToggle.style.border = '1px solid var(--border-subtle)';
+        filterTypeToggle.className = 'filter-mode-toggle';
         filterTypeToggle.innerHTML = `
             <button type="button" class="chip-btn ${state.filterMode === 'category' ? 'active' : ''}" id="btn-mode-cat">Categories</button>
             <button type="button" class="chip-btn ${state.filterMode === 'country' ? 'active' : ''}" id="btn-mode-country">Countries</button>
@@ -332,7 +286,7 @@
                 const btn = document.createElement('button');
                 btn.type = 'button';
                 btn.className = `chip-btn ${isSelected ? 'active' : ''}`;
-                btn.innerHTML = `<span>${cat.icon}</span> <span>${cat.name}</span>`;
+                btn.textContent = cat.id === 'all' ? 'All' : cat.name;
                 btn.onclick = () => {
                     state.selectedCategory = cat.id;
                     renderFilterChips();
@@ -355,6 +309,7 @@
                 elements.chipsContainer.appendChild(btn);
             });
         }
+        elements.chipsContainer.scrollLeft = keepScroll;
     }
 
     /* --------------------------------------------------------------------------
@@ -690,7 +645,7 @@
             });
         }
 
-        elements.statsBadge.innerHTML = `Showing <b>${state.displayedChannels.length}</b> channels &bull; <span style="color:var(--accent-emerald)">${onlineCount} Online</span> &bull; <span style="color:var(--accent-rose)">${offlineCount} Offline</span>`;
+        elements.statsBadge.innerHTML = `<b>${state.displayedChannels.length}</b> channels &bull; <span style="color:var(--accent-emerald)">${onlineCount} live</span> &bull; <span style="color:var(--accent-rose)">${offlineCount} offline</span>`;
     }
 
     let channelScrollObserver = null;
@@ -721,8 +676,10 @@
         let cursor = 0;
 
         const sentinel = document.createElement('div');
-        sentinel.style.cssText = 'height:1px;width:100%;';
-        container.appendChild(sentinel);
+        // covers the last 600px of the list (the wrapper is position:relative): the next chunk loads
+        // before the user reaches the end, and a fast scroll cannot jump over it
+        sentinel.style.cssText = 'position:absolute;left:0;bottom:0;height:600px;max-height:100%;width:1px;pointer-events:none;';
+        wrapper.appendChild(sentinel);
 
         function appendChunk() {
             const slice = state.displayedChannels.slice(cursor, cursor + CHUNK);
@@ -735,10 +692,15 @@
             // Health-check only the rows we actually rendered, so their Live/Offline
             // badges populate and the Hide-Offline filter has real statuses to act on.
             if (window.streamHealthChecker) window.streamHealthChecker.queueBatch(slice, slice.length);
-            if (cursor >= state.displayedChannels.length && channelScrollObserver) {
+            if (!channelScrollObserver) return;
+            if (cursor >= state.displayedChannels.length) {
                 channelScrollObserver.disconnect();
                 channelScrollObserver = null;
                 sentinel.remove();
+            } else {
+                // re-observe: the observer only reports changes, and the sentinel may still be in view
+                channelScrollObserver.unobserve(sentinel);
+                channelScrollObserver.observe(sentinel);
             }
         }
 
@@ -747,7 +709,7 @@
         if (cursor < state.displayedChannels.length) {
             channelScrollObserver = new IntersectionObserver(entries => {
                 if (entries.some(e => e.isIntersecting)) appendChunk();
-            }, { root: container, rootMargin: '500px' });
+            });
             channelScrollObserver.observe(sentinel);
         } else {
             sentinel.remove();
@@ -996,6 +958,8 @@
                         badge.classList.add('status-badge-local');
                         badge.innerHTML = '⚡ LAN';
                         badge.title = entry.reason || 'Local network stream';
+                    } else {
+                        badge.innerHTML = ''; // unknown: drop the stale "Checking" label
                     }
                 }
 
@@ -1025,6 +989,8 @@
                         listBadge.classList.add('badge-health-local');
                         listBadge.innerHTML = '⚡ LAN';
                         listBadge.title = entry.reason || 'Local network stream';
+                    } else if (entry.status !== 'checking') {
+                        listBadge.innerHTML = '';
                     }
                 }
             });
@@ -1046,6 +1012,12 @@
 
         // Hide geo-alert
         if (elements.geoAlertBanner) elements.geoAlertBanner.style.display = 'none';
+
+        // Bring the player into view when a channel is picked from far down the guide
+        const playerBox = elements.video.parentElement;
+        playerBox.classList.add('has-channel');
+        const pr = playerBox.getBoundingClientRect();
+        if (pr.bottom < 120 || pr.top > window.innerHeight - 120) playerBox.scrollIntoView({ block: 'start', behavior: 'smooth' });
 
         // Record to recently played
         state.recentChannels = [channel, ...state.recentChannels.filter(c => c.url !== channel.url)].slice(0, 15);
@@ -1123,6 +1095,9 @@
 
         // Check if Web Feed (Iframe mode for beIN Sports etc.)
         if (channel.type === 'web') {
+            // stop any HLS stream still playing behind the embed
+            if (state.hlsInstance) { state.hlsInstance.destroy(); state.hlsInstance = null; }
+            elements.video.pause();
             elements.video.style.display = 'none';
             elements.sportsIframe.style.display = 'block';
             elements.sportsIframe.src = streamUrl;
@@ -1150,7 +1125,8 @@
             return;
         }
 
-        // HLS Stream mode
+        // HLS Stream mode (unload any embed so it does not keep playing hidden)
+        elements.sportsIframe.removeAttribute('src');
         elements.sportsIframe.style.display = 'none';
         elements.video.style.display = 'block';
 
@@ -1209,6 +1185,13 @@
             });
 
             hls.on(Hls.Events.ERROR, async (event, data) => {
+                // A direct public stream hit a network error (segment blocked by CORS or mixed content):
+                // hls.js would retry for ~30s before giving up, so switch to the proxy straight away.
+                const isPublic = !(window.SmartProxyEngine && window.SmartProxyEngine.isPrivateUrl(streamUrl));
+                if (!data.fatal && !needProxy && isPublic && state.routingMode !== 'direct' && data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                    playChannel(channel, serverIndex, true, 0);
+                    return;
+                }
                 if (data.fatal) {
                     console.warn('HLS Error on Server', serverIndex, ':', data.type, data.details, data);
 
@@ -1294,12 +1277,13 @@
                 : streamUrl;
 
             elements.video.src = playUrl;
-            elements.video.addEventListener('loadedmetadata', () => {
+            // assigned, not added: each channel switch replaces the previous channel's handlers
+            elements.video.onloadedmetadata = () => {
                 elements.currentChannelStatus.innerHTML = '<span class="live-pulse-dot"></span> Stream Live';
-                elements.video.play();
-            });
+                elements.video.play().catch(() => {});
+            };
 
-            elements.video.addEventListener('error', () => {
+            elements.video.onerror = () => {
                 if (!needProxy) {
                     playChannel(channel, serverIndex, true, 0);
                 } else if (servers.length > serverIndex + 1) {
@@ -1308,7 +1292,7 @@
                     elements.currentChannelStatus.innerHTML = '<span style="color:var(--accent-rose)">⚠️ Stream unavailable</span>';
                     showStreamErrorBanner(channel, servers, 'unknown');
                 }
-            });
+            };
         }
 
         startDiagnosticsTimer();
@@ -1348,24 +1332,24 @@
         const CFG = window.SmartProxyEngine ? window.SmartProxyEngine.CONFIG : {};
         elements.geoAlertBanner.style.display = 'block';
         elements.geoAlertBanner.innerHTML = `
-            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
-                <div style="display:flex;align-items:center;gap:10px;">
-                    <span style="font-size:1.3rem;">${icon}</span>
+            <div class="banner-row">
+                <div class="banner-msg">
+                    <span class="banner-icon">${icon}</span>
                     <div>
-                        <div style="font-weight:700;color:var(--accent-amber);">${title}</div>
-                        <div style="font-size:0.78rem;color:var(--text-secondary);">${description}</div>
+                        <div class="banner-title">${title}</div>
+                        <div class="banner-desc">${description}</div>
                     </div>
                 </div>
-                <div style="display:flex;align-items:center;gap:8px;">
-                    ${hasAltServers ? `<button type="button" class="action-btn" id="geo-btn-next-mirror" style="background:var(--accent-cyan);color:#000;font-weight:700;">🔄 Try Alternate Server</button>` : ''}
+                <div class="banner-actions">
+                    ${hasAltServers ? `<button type="button" class="action-btn btn-primary" id="geo-btn-next-mirror">🔄 Try Alternate Server</button>` : ''}
                     ${errorType !== 'dead' ? `<button type="button" class="action-btn" id="geo-btn-alt-proxy">🌐 Force Global Proxy</button>` : ''}
                     <button type="button" class="action-btn" id="geo-btn-reload">🔃 Reload</button>
                     <button type="button" class="action-btn" id="geo-btn-guide">ℹ️ Geo-Tips</button>
                 </div>
                 ${errorType === 'geo' ? `
-                <div style="display:flex;gap:6px;width:100%;margin-top:2px;">
-                    <input type="url" id="geo-proxy-input" class="search-input" placeholder="Header-capable proxy in the right region (worker/VPS that accepts ?ref=&ua=&url=)" style="flex:1;padding:6px 10px;font-size:0.75rem;" value="${CFG.customProxy || ''}">
-                    <button type="button" class="action-btn" id="geo-btn-save-proxy" style="background:var(--accent-emerald);color:#000;font-weight:700;white-space:nowrap;">🌍 Save &amp; Retry</button>
+                <div class="banner-proxy">
+                    <input type="url" id="geo-proxy-input" class="text-input" placeholder="Header-capable proxy in the right region (worker/VPS that accepts ?ref=&ua=&url=)" value="${CFG.customProxy || ''}">
+                    <button type="button" class="action-btn" id="geo-btn-save-proxy">🌍 Save &amp; Retry</button>
                 </div>` : ''}
             </div>
         `;
@@ -1660,6 +1644,7 @@
             btn.addEventListener('click', () => {
                 const tab = btn.getAttribute('data-tab');
                 if (!tab) return;
+                if (tab === 'custom') { openModal(elements.customModal); return; }
 
                 document.querySelectorAll('.nav-tab-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
@@ -1673,6 +1658,24 @@
                 renderFilterChips();
                 applyFiltersAndRender();
             });
+        });
+
+        // Show the saved guide layout on its toggle
+        document.getElementById('view-grid-btn').classList.toggle('active', state.viewMode === 'grid');
+        document.getElementById('view-list-btn').classList.toggle('active', state.viewMode === 'list');
+
+        // The filter strip has no visible scrollbar: let a mouse wheel move it sideways
+        elements.chipsContainer.addEventListener('wheel', (e) => {
+            const c = elements.chipsContainer;
+            if (!e.deltaY || c.scrollWidth <= c.clientWidth) return;
+            e.preventDefault();
+            c.scrollLeft += e.deltaY;
+        }, { passive: false });
+
+        // Connection came back (wifi <-> mobile data): retry the channel if it is not playing
+        window.addEventListener('online', () => {
+            const ch = state.currentChannel;
+            if (ch && ch.type !== 'web' && (elements.video.paused || elements.video.readyState < 3)) playChannel(ch, state.currentServerIndex);
         });
 
         // Search Input

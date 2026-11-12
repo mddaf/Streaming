@@ -242,6 +242,9 @@ class StreamHealthChecker {
         } catch (err) {
             clearTimeout(timer);
             const isTimeout = err.name === 'AbortError';
+            // fetch itself failed: the PROXY was unreachable (blocked, rate-limited), which says
+            // nothing about the channel. Report unknown so it is not shown or hidden as offline.
+            if (!isTimeout) return { status: 'unknown', code: 0, errorType: 'proxy', reason: 'Health check unavailable (proxy unreachable)' };
             return {
                 status: 'offline',
                 code: 0,
@@ -255,7 +258,7 @@ class StreamHealthChecker {
      * Local/LAN streams can't be verified from a browser (CORS + mixed-content).
      */
     isLocalUrl(url) {
-        return /\/\/(172\.16\.|192\.168\.|10\.|localhost|127\.0\.0\.1)/.test(url);
+        return !!window.SmartProxyEngine && window.SmartProxyEngine.isPrivateUrl(url);
     }
 
     /**
@@ -362,8 +365,8 @@ class StreamHealthChecker {
         } finally {
             this.abortControllers.delete(mainUrl);
             if (entry) {
-                this.cache.set(mainUrl, entry);
-                this.persistCache();
+                // an unknown result is not cached, so the channel is checked again next time
+                if (entry.status !== 'unknown') { this.cache.set(mainUrl, entry); this.persistCache(); }
                 this.notifyChange(mainUrl, entry);
             }
         }
