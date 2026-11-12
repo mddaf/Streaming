@@ -129,8 +129,6 @@ function shouldRouteThroughProxy(url, forceProxy = false) {
     if (forceProxy || PROXY_CONFIG.currentMode === 'proxy') return true;
     if (PROXY_CONFIG.currentMode === 'direct') return false;
 
-    // Private / local networks cannot be reached by a cloud proxy: connect directly.
-
     // In 'auto' mode https streams are tried directly first (works where the proxy is blocked or
     // rate-limited, and uses the viewer's own region); app.js falls back to the proxy on the
     // first failure. http streams must be proxied: an https page cannot load them.
@@ -239,7 +237,7 @@ async function resolverRequest(path, params = {}, signal) {
     return data; // { url, headers:{referer,origin,userAgent} }
 }
 
-function resolveStream(id, signal) { return resolverRequest('/resolve', { id }, signal); }
+function resolveStream(id, signal, variant) { return resolverRequest('/resolve', { id, ...(variant != null ? { variant } : {}) }, signal); }
 function sniffStream(url, signal) { return resolverRequest('/sniff', { url }, signal); }
 function fetchFeed(signal) { return resolverRequest('/feed', {}, signal); }
 

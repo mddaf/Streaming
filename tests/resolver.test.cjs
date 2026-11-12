@@ -248,3 +248,22 @@ test('HD Streamz native-only methods are rejected explicitly', async () => {
     await assert.rejects(context.resolveHdStream({ api: 'https://hd.test/source', channelId: 1 }, {}), /playback method/);
     await assert.rejects(context.hdSourceJson(new Response('YWJjZA=='), {}), /HDSTREAMZ_CODEC_KEY/);
 });
+
+test('catalog source variants resolve exactly the selected HD quality and reject invalid variants', async () => {
+    const catalogUrl = 'https://catalog.test/data.json';
+    const api = 'https://hd.test/source';
+    const { context, calls } = worker({
+        [catalogUrl]: { body: { data: { channels: [{ id: 7, title: 'Fixture', type: 't', status: 'yes', sources: [{}, {}] }] } } },
+        [api + '?id=7&quality=1&type=0&app=188']: { body: { status: 'ok', data: { method: 'default', link: 'https://cdn.test/backup.m3u8' } } }
+    });
+    const env = { CRICFY_ENABLED: 'false', HDSTREAMZ_CATALOG_URL: catalogUrl, HDSTREAMZ_SOURCE_URL: api };
+    const catalog = await (await context.handleCatalog(env)).json();
+    const channel = catalog.find(item => item.id === 'hdstreamz:7');
+    assert.equal(channel.variants.length, 2);
+    const response = await context.handleResolve(new Request('https://worker.test/resolve?id=hdstreamz:7&variant=1'), env);
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).url, 'https://cdn.test/backup.m3u8');
+    assert.ok(!calls.some(call => call.url.includes('quality=0')));
+    const invalid = await context.handleResolve(new Request('https://worker.test/resolve?id=hdstreamz:7&variant=9'), env);
+    assert.equal(invalid.status, 400);
+});

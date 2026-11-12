@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
-function app() {
+function app(HlsClass) {
     const nodes = new Map();
     const element = () => ({
         style: {}, classList: { add() {}, toggle() {} },
@@ -19,20 +19,24 @@ function app() {
     const pending = [];
     const headers = [];
     const engine = {
-        resolveStream: (id, signal) => new Promise((resolve, reject) => pending.push({ id, signal, resolve, reject })),
+        resolveStream: (id, signal, variant) => new Promise((resolve, reject) => pending.push({ id, signal, variant, resolve, reject })),
         sniffStream: (url, signal) => new Promise((resolve, reject) => pending.push({ url, signal, resolve, reject })),
         shouldRouteThroughProxy: () => false,
         setStreamHeaders: value => headers.push(value),
         buildProxyUrl: url => 'https://proxy.test/?url=' + encodeURIComponent(url), CONFIG: {}
     };
-    const window = { innerHeight: 900, SmartProxyEngine: engine };
-    const context = vm.createContext({ window, document, AbortController, console,
-        setInterval: () => 1, clearInterval() {}, setTimeout,
+    const window = { innerHeight: 900, SmartProxyEngine: engine, Hls: HlsClass };
+    const timers = new Map();
+    let timerId = 0;
+    const context = vm.createContext({ window, document, AbortController, console, Hls: HlsClass,
+        setInterval: () => 1, clearInterval() {},
+        setTimeout: (callback, delay) => { const id = ++timerId; timers.set(id, { callback, delay }); return id; },
+        clearTimeout: id => timers.delete(id),
         localStorage: { setItem() {} }
     });
     const source = fs.readFileSync('js/app.js', 'utf8').replace(/\/\/ Run when DOM is ready[\s\S]*$/, 'applyFiltersAndRender = () => {}; window.testApp = { playChannel, state, reconcileWorkerCatalog, refreshWorkerCatalog }; })();');
     vm.runInContext(source, context);
-    return { ...window.testApp, nodes, pending, headers, engine, document };
+    return { ...window.testApp, nodes, pending, headers, engine, document, timers };
 }
 const flush = () => new Promise(setImmediate);
 const catalog = id => ({ name: id, url: 'catalog://' + id, servers: [{ url: 'catalog://' + id, isCatalog: true, catalogId: id }] });
@@ -69,6 +73,63 @@ test('headerless catalog HLS uses direct-first routing', async () => {
     pending[0].resolve({ url: 'https://cdn.test/public.m3u8', headers: {} });
     await flush();
     assert.equal(nodes.get('main-video').src, 'https://cdn.test/public.m3u8');
+});
+
+test('startup timeout tries one proxy then the next server and stops after actual playback', () => {
+    const { playChannel, state, timers, nodes } = app();
+    const channel = { name: 'Mirrors', url: 'https://cdn.test/one.m3u8', servers: [
+        { url: 'https://cdn.test/one.m3u8' }, { url: 'https://cdn.test/two.m3u8' }
+    ] };
+    playChannel(channel);
+    timers.get(state.startupTimer).callback();
+    assert.match(nodes.get('main-video').src, /^https:\/\/proxy.test/);
+    timers.get(state.startupTimer).callback();
+    assert.equal(state.currentServerIndex, 1);
+    assert.equal(nodes.get('main-video').src, channel.servers[1].url);
+    nodes.get('main-video').onplaying();
+    assert.equal(timers.has(state.startupTimer), false);
+});
+
+test('an abandoned startup timeout cannot replace a newly selected channel', () => {
+    const { playChannel, state, timers, nodes } = app();
+    playChannel({ name: 'Old', url: 'https://cdn.test/old.m3u8' });
+    const oldTimeout = timers.get(state.startupTimer).callback;
+    playChannel({ name: 'New', url: 'https://cdn.test/new.m3u8' });
+    oldTimeout();
+    assert.equal(nodes.get('main-video').src, 'https://cdn.test/new.m3u8');
+});
+
+test('catalog qualities become separate mirrors and resolver failures advance to the next quality', async () => {
+    const { reconcileWorkerCatalog, playChannel, pending, state } = app();
+    const channels = reconcileWorkerCatalog([], [{ id: 'hdstreamz:7', name: 'Fixture', variants: [{ index: 0, name: 'HD' }, { index: 1, name: 'SD' }] }]);
+    assert.equal(channels[0].servers.length, 2);
+    playChannel(channels[0]);
+    assert.equal(pending[0].variant, 0);
+    pending[0].reject(new Error('Unavailable source'));
+    await flush();
+    assert.equal(state.currentServerIndex, 1);
+    assert.equal(pending[1].variant, 1);
+});
+
+test('fatal HLS failures advance mirrors and destroy the previous player', () => {
+    const instances = [];
+    class FakeHls {
+        static isSupported() { return true; }
+        static DefaultConfig = { loader: class {} };
+        static Events = { MANIFEST_PARSED: 'manifest', LEVEL_SWITCHED: 'level', ERROR: 'error' };
+        static ErrorTypes = { NETWORK_ERROR: 'network' };
+        constructor(config) { this.config = config; this.events = {}; instances.push(this); }
+        on(event, handler) { this.events[event] = handler; }
+        loadSource() {} attachMedia() {} destroy() { this.destroyed = true; }
+    }
+    const { playChannel, engine, state } = app(FakeHls);
+    engine.createSmartProxyLoader = () => class {};
+    const channel = { name: 'HLS Mirrors', url: 'https://cdn.test/a.m3u8', servers: [{ url: 'https://cdn.test/a.m3u8' }, { url: 'https://cdn.test/b.m3u8' }] };
+    playChannel(channel);
+    instances[0].events.error(null, { fatal: true, type: 'network', response: { code: 404 } });
+    assert.equal(state.currentServerIndex, 1);
+    assert.equal(instances[0].destroyed, true);
+    assert.equal(instances[1].config.backBufferLength, 15);
 });
 
 test('a local stream shows permission help and never falls back to a cloud proxy', () => {

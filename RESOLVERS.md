@@ -11,6 +11,7 @@ is an alternative for other hosting environments.
 | --- | --- |
 | `GET /catalog` | Public channel metadata, merged into the website guide |
 | `GET /resolve?id=CHANNEL_ID` | Fresh `{url, headers}` from the channel's resolver chain |
+| `GET /resolve?id=CHANNEL_ID&variant=INDEX` | One selected HD Streamz source quality; indexes come from public catalog `variants` |
 | `GET /sniff?url=ENCODED_EMBED_URL` | First verified HLS manifest discovered in an embed page |
 | `GET /feed` | Current SportzFY `livetv` page URL from its remote configuration |
 | `GET /sources` | CRICFy and HD Streamz catalog availability, fetch errors and sniffer configuration status |
@@ -134,6 +135,22 @@ Cloudflare setup uses `tools/cloudflare-sniffer.mjs` and the proxy's
 `DYNAMIC_SNIFFER` service binding instead of a public service URL/token.
 
 Channel switching cancels pending browser requests and ignores stale results.
+The player tries each server in order, with one primary proxy retry when useful,
+and advances when startup fails or takes too long. Ordinary source attempts have
+a ten-second startup budget; local sources get twenty seconds and web/feed
+discovery gets thirty-five. Successful playback stops the startup timer. HD
+Streamz qualities are separate server choices, so an unreachable first link
+does not prevent trying the remaining supported sources. Browser autoplay
+permission failures show a Play instruction instead of skipping a source.
+
+The guide renders sources as they arrive, prioritizes Worker catalog channels,
+and pages results sixty cards at a time to keep the mobile DOM bounded. Search
+still covers the full guide. Background health checks use two concurrent requests,
+read at most the first 8 KiB of each response and cancel its body. Their timeouts
+cover response bodies, too. Selecting a stream pauses and cancels background
+probes so playback has priority. Availability badges indicate reachable media
+endpoints; they do not establish that video frames will play.
+
 Headerless resolved streams use direct-first routing; sources requiring playback
 headers use the proxy. This preserves the viewer's region for public HLS feeds.
 Resolved URLs stay out of saved recents and catalog entries, so reload requests
@@ -143,7 +160,7 @@ segments, and HLS keys.
 Run Worker/player integration tests and the real-browser fixture tests with:
 
 ```sh
-node --test tests/resolver.test.cjs tests/playback.test.cjs tools/browser-sniffer.test.mjs tools/cloudflare-sniffer.test.mjs tools/site-refresh.test.mjs
+node --test tests/resolver.test.cjs tests/playback.test.cjs tests/health-checker.test.cjs tools/browser-sniffer.test.mjs tools/cloudflare-sniffer.test.mjs tools/site-refresh.test.mjs
 ```
 
 The browser test loads a local iframe that builds its manifest URL dynamically

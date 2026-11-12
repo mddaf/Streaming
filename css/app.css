@@ -432,6 +432,8 @@ img { display: block; max-width: 100%; }
 /* grid view: logo tile + caption */
 .channels-grid, .channels-list-view { position: relative; }   /* anchors the lazy-load sentinel */
 .channels-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 14px 10px; }
+.guide-pagination { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 18px 0; font-size: 0.8rem; }
+.guide-pagination button:disabled { opacity: 0.4; cursor: default; }
 .channel-card {
     position: relative; display: flex; flex-direction: column; gap: 6px; min-width: 0; cursor: pointer;
     /* the browser skips rendering off-screen cards, so deep scrolling stays smooth */

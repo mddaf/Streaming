@@ -87,7 +87,7 @@ See [Cloudflare's GitHub Actions setup](https://developers.cloudflare.com/worker
 ## Local checks
 
 ```powershell
-node --test tests/resolver.test.cjs tests/playback.test.cjs tools/browser-sniffer.test.mjs tools/cloudflare-sniffer.test.mjs tools/site-refresh.test.mjs
+node --test tests/resolver.test.cjs tests/playback.test.cjs tests/health-checker.test.cjs tools/browser-sniffer.test.mjs tools/cloudflare-sniffer.test.mjs tools/site-refresh.test.mjs
 npm.cmd run check:deploy --prefix tools
 ```
 

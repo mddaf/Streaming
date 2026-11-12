@@ -634,7 +634,8 @@ async function loadCricfySource(env) {
 // GET /catalog  -> public channel list (no internal api/template fields leaked)
 async function handleCatalog(env) {
     const cat = await loadCatalog(env);
-    const pub = cat.map(c => ({ id: c.id, name: c.name, logo: c.logo || '', group: c.group || '', category: c.category || '', country: c.country || '', type: c.type || 'direct' }));
+    const pub = cat.map(c => ({ id: c.id, name: c.name, logo: c.logo || '', group: c.group || '', category: c.category || '', country: c.country || '', type: c.type || 'direct',
+        ...(c.resolvers?.[0]?.type === 'hdstreamz' ? { variants: c.resolvers.map((resolver, index) => ({ index, name: 'Source ' + (index + 1) })) } : {}) }));
     return new Response(JSON.stringify(pub), { headers: JSON_CORS });
 }
 
@@ -644,8 +645,17 @@ async function handleResolve(request, env) {
     const cat = await loadCatalog(env);
     const ch = cat.find(c => c.id === id);
     if (!ch) return new Response(JSON.stringify({ error: 'unknown channel id', id }), { status: 404, headers: JSON_CORS });
+    const variant = new URL(request.url).searchParams.get('variant');
+    let selected = ch;
+    if (variant !== null) {
+        const index = Number(variant);
+        if (!/^\d+$/.test(variant) || !Number.isSafeInteger(index) || ch.resolvers?.[index]?.type !== 'hdstreamz') {
+            return new Response(JSON.stringify({ error: 'unknown source variant' }), { status: 400, headers: JSON_CORS });
+        }
+        selected = ch.resolvers[index];
+    }
     try {
-        return new Response(JSON.stringify(await resolveChannel(ch, 0, env)), { headers: JSON_CORS });
+        return new Response(JSON.stringify(await resolveChannel(selected, 0, env)), { headers: JSON_CORS });
     } catch (e) {
         return new Response(JSON.stringify({ error: 'resolve failed', message: e.message, id }), { status: 502, headers: JSON_CORS });
     }

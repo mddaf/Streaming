@@ -66,10 +66,55 @@ test('real website refreshes its guide while its resolved embed keeps playing', 
         await page.locator('#save-custom-btn').click();
         const localHelp = page.locator('#local-network-help');
         assert.equal(await localHelp.isVisible(), true);
-        if (await localHelp.getAttribute('open') === null) await localHelp.locator('summary').click();
-        assert.equal(await localHelp.getAttribute('open') !== null, true);
+        await page.waitForFunction(() => document.getElementById('local-network-help').open);
         assert.match(await localHelp.innerText(), /website cannot accept browser permissions/);
         assert.deepEqual(errors, []);
+
+        const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+        const mobileErrors = [];
+        mobile.on('pageerror', error => mobileErrors.push(error.message));
+        const cdp = await mobile.context().newCDPSession(mobile);
+        await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+        let releaseSlow;
+        const slowSource = new Promise(resolve => { releaseSlow = resolve; });
+        let slowFinished = false;
+        const playlist = '#EXTM3U\n' + Array.from({ length: 12000 }, (_, i) => `#EXTINF:-1,Performance Channel ${String(i).padStart(5, '0')}\nhttps://fixture.test/${i}.m3u8`).join('\n');
+        await mobile.route('**/*', async route => {
+            const url = new URL(route.request().url());
+            if (url.hostname === '127.0.0.1') return route.continue();
+            if (url.hostname.endsWith('workers.dev') && url.pathname === '/catalog') return route.fulfill({ json: [{ id: 'fixture', name: 'AAA Fast Catalog', group: 'Sports', type: 'feed' }] });
+            if (url.hostname.endsWith('workers.dev') && url.pathname === '/resolve') return route.fulfill({ json: { url: base + '/fixture-player', type: 'web' } });
+            if (url.hostname === 'iptv-org.github.io') return route.fulfill({ body: playlist });
+            if (url.hostname === 'raw.githubusercontent.com') {
+                await slowSource;
+                slowFinished = true;
+                return route.fulfill({ body: '#EXTM3U\n' });
+            }
+            return route.abort();
+        });
+        try {
+            await mobile.goto(base);
+            await mobile.getByText('AAA Fast Catalog', { exact: true }).first().waitFor();
+            assert.equal(slowFinished, false, 'the catalog must render before the slow source finishes');
+            await mobile.waitForFunction(() => document.querySelector('#stats-badge')?.textContent.includes('12000') || document.querySelectorAll('.channel-card').length === 60);
+            assert.ok(await mobile.locator('.channel-card').count() <= 60);
+            await mobile.locator('#channels-container').evaluate(node => { node.scrollTop = node.scrollHeight; });
+            await mobile.getByRole('button', { name: 'Next', exact: true }).click();
+            assert.ok(await mobile.locator('.channel-card').count() <= 60, 'paging must replace cards instead of accumulating DOM');
+            await mobile.locator('#search-input').fill('Performance Channel 11999');
+            await mobile.getByText('Performance Channel 11999', { exact: true }).first().waitFor();
+            releaseSlow();
+            await mobile.locator('#search-input').fill('AAA Fast Catalog');
+            await mobile.getByText('AAA Fast Catalog', { exact: true }).first().click();
+            await mobile.waitForFunction(() => document.querySelector('#sports-iframe').src.endsWith('/fixture-player'));
+            await mobile.locator('#search-input').fill('Performance Channel 11998');
+            await mobile.getByText('Performance Channel 11998', { exact: true }).first().waitFor();
+            assert.equal(await mobile.evaluate(() => window.streamHealthChecker.paused), true);
+            assert.deepEqual(mobileErrors, []);
+        } finally {
+            releaseSlow();
+            await mobile.close();
+        }
     } finally {
         if (browser) await browser.close();
         server.closeAllConnections();

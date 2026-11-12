@@ -410,12 +410,27 @@
                 window.streamHealthChecker.cancelAllPending();
             }
 
-            // Fetch all playlists concurrently in parallel
-            const fetchPromises = sourcesToFetch.map(async (src) => {
-                const res = await fetch(src.url);
+            const loaded = [];
+            let currentCatalog = [];
+            let publishTimer;
+            const publish = () => {
+                state.masterChannels = mergeLoadedSources(loaded, currentCatalog);
+                applyFiltersAndRender();
+            };
+            const schedulePublish = () => {
+                clearTimeout(publishTimer);
+                publishTimer = setTimeout(publish, 80);
+            };
+            publish();
+            // A slow source must not hold the other guides behind it.
+            const fetchPromises = sourcesToFetch.map(async (src, index) => {
+                const res = await fetch(src.url, { signal: AbortSignal.timeout(10000) });
                 if (!res.ok) throw new Error(`${src.name} HTTP ${res.status}`);
                 const text = await res.text();
-                return { src, channels: parseM3U(text, src.name) };
+                const result = { src, channels: parseM3U(text, src.name) };
+                loaded[index] = { status: 'fulfilled', value: result };
+                schedulePublish();
+                return result;
             });
 
             // Concurrently ask the Cloudflare Worker for its /catalog channels
@@ -423,7 +438,11 @@
                 if (window.SmartProxyEngine && typeof window.SmartProxyEngine.fetchCatalog === 'function') {
                     try {
                         const cat = await window.SmartProxyEngine.fetchCatalog();
-                        if (Array.isArray(cat)) return cat;
+                        if (Array.isArray(cat)) {
+                            currentCatalog = cat;
+                            schedulePublish();
+                            return cat;
+                        }
                     } catch (e) {
                         console.warn('Worker /catalog fetch failed:', e);
                     }
@@ -435,62 +454,12 @@
                 Promise.allSettled(fetchPromises),
                 catalogPromise
             ]);
-            const mergedMap = new Map();
-
-            // First add featured web sports streams (beIN Sports etc.)
-            FEATURED_SPORTS.forEach(fs => {
-                const norm = normalizeChannelName(fs.name);
-                mergedMap.set(norm, { ...fs });
-            });
-
-            // Process all fetched sources
-            results.forEach((res) => {
-                if (res.status === 'fulfilled') {
-                    const { src, channels } = res.value;
-                    channels.forEach(ch => {
-                        const normKey = normalizeChannelName(ch.name);
-                        if (!normKey) return;
-
-                        const meta = detectCategoryAndCountry(ch, src);
-                        ch.category = meta.category;
-                        ch.country = meta.country;
-
-                        if (!mergedMap.has(normKey)) {
-                            // First occurrence: create channel entry with Server 1
-                            ch.servers = [{ name: `Server 1 (${src.name})`, url: ch.url }];
-                            ch.sources = [src.name];
-                            mergedMap.set(normKey, ch);
-                        } else {
-                            // Multiple Server Mirror: Attach as Server 2, Server 3, etc.!
-                            const existing = mergedMap.get(normKey);
-                            const alreadyHasUrl = existing.servers.some(s => s.url === ch.url);
-                            if (!alreadyHasUrl) {
-                                existing.servers.push({
-                                    name: `Server ${existing.servers.length + 1} (${src.name})`,
-                                    url: ch.url
-                                });
-                                if (!existing.sources.includes(src.name)) {
-                                    existing.sources.push(src.name);
-                                }
-                                if (!existing.logo && ch.logo) {
-                                    existing.logo = ch.logo;
-                                }
-                            }
-                        }
-                    });
-                }
-            });
-
-            state.masterChannels = reconcileWorkerCatalog(Array.from(mergedMap.values()), catalogChannels);
+            clearTimeout(publishTimer);
+            state.masterChannels = mergeLoadedSources(results, catalogChannels);
             state.lastCatalogRefresh = Date.now();
             state.isLoading = false;
 
             applyFiltersAndRender();
-
-            // Queue background health checks for visible channels
-            if (window.streamHealthChecker && state.masterChannels.length > 0) {
-                window.streamHealthChecker.queueBatch(state.masterChannels, 50);
-            }
         } catch (err) {
             state.isLoading = false;
             elements.channelsContainer.innerHTML = `
@@ -501,6 +470,56 @@
                 </div>
             `;
         }
+    }
+
+    function mergeLoadedSources(results, catalogChannels) {
+        const mergedMap = new Map();
+
+        // First add featured web sports streams (beIN Sports etc.)
+        FEATURED_SPORTS.forEach(fs => {
+            const norm = normalizeChannelName(fs.name);
+            mergedMap.set(norm, { ...fs, servers: fs.servers.map(server => ({ ...server })), sources: ['Featured'] });
+        });
+
+        // Process all fetched sources
+        results.forEach((res) => {
+            if (res.status === 'fulfilled') {
+                const { src, channels } = res.value;
+                channels.forEach(ch => {
+                    const normKey = normalizeChannelName(ch.name);
+                    if (!normKey) return;
+
+                    const meta = detectCategoryAndCountry(ch, src);
+                    ch.category = meta.category;
+                    ch.country = meta.country;
+
+                    if (!mergedMap.has(normKey)) {
+                        // First occurrence: create channel entry with Server 1
+                        ch.servers = [{ name: `Server 1 (${src.name})`, url: ch.url }];
+                        ch.sources = [src.name];
+                        mergedMap.set(normKey, ch);
+                    } else {
+                        // Multiple Server Mirror: Attach as Server 2, Server 3, etc.!
+                        const existing = mergedMap.get(normKey);
+                        const alreadyHasUrl = existing.servers.some(s => s.url === ch.url);
+                        if (!alreadyHasUrl) {
+                            existing.servers.push({
+                                name: `Server ${existing.servers.length + 1} (${src.name})`,
+                                url: ch.url
+                            });
+                            if (!existing.sources.includes(src.name)) {
+                                existing.sources.push(src.name);
+                            }
+                            if (!existing.logo && ch.logo) {
+                                existing.logo = ch.logo;
+                            }
+                        }
+                    }
+                });
+            }
+        });
+
+        return reconcileWorkerCatalog(Array.from(mergedMap.values()), catalogChannels);
     }
 
     function reconcileWorkerCatalog(channels, catalogChannels) {
@@ -522,7 +541,11 @@
                 const normKey = normalizeChannelName(catCh.name) || normalizeChannelName(catCh.id);
                 if (!normKey) return;
                 const catUrl = 'catalog://' + catCh.id;
-                const server = { name: `Server ${'1'} (Worker ${catCh.type || 'Resolver'})`, url: catUrl, isCatalog: true, catalogId: catCh.id };
+                const variants = catCh.variants?.length ? catCh.variants : [{ index: null }];
+                const catalogServers = variants.map(variant => ({
+                    name: variant.name || `Server 1 (Worker ${catCh.type || 'Resolver'})`,
+                    url: catUrl, isCatalog: true, catalogId: catCh.id, catalogVariant: variant.index
+                }));
 
                 if (!mergedMap.has(normKey)) {
                     mergedMap.set(normKey, {
@@ -531,18 +554,21 @@
                         type: catCh.type || 'lookup',
                         category: catCh.category || ((catCh.group && catCh.group.toLowerCase().includes('sport')) ? 'sports' : 'general'),
                         country: catCh.country || 'unknown', url: catUrl,
-                        servers: [server], sources: ['Cloudflare Catalog']
+                        servers: catalogServers, sources: ['Cloudflare Catalog']
                     });
                 } else {
                     const existing = mergedMap.get(normKey);
                     if (!existing.servers.some(s => s.catalogId === catCh.id || s.url === catUrl)) {
-                        existing.servers.push({ ...server, name: `Server ${existing.servers.length + 1} (Worker ${catCh.type || 'Resolver'})` });
+                        existing.servers.push(...catalogServers);
                         if (!existing.sources.includes('Cloudflare Catalog')) existing.sources.push('Cloudflare Catalog');
                     }
                 }
             });
 
-        return Array.from(mergedMap.values());
+        const guide = Array.from(mergedMap.values());
+        const catalogChannelsFirst = guide.filter(channel => channel.servers?.some(server => server.isCatalog));
+        const otherChannels = guide.filter(channel => !channel.servers?.some(server => server.isCatalog));
+        return [...catalogChannelsFirst, ...otherChannels];
     }
 
     async function refreshWorkerCatalog() {
@@ -618,6 +644,7 @@
        Filters & Rendering (Using Restored Category / Country Filters)
        -------------------------------------------------------------------------- */
     function applyFiltersAndRender() {
+        state.guidePage = 0;
         if (state.activeTab === 'sports') {
             state.displayedChannels = FEATURED_SPORTS;
             renderChannels();
@@ -690,11 +717,9 @@
         elements.statsBadge.innerHTML = `<b>${state.displayedChannels.length}</b> channels &bull; <span style="color:var(--accent-emerald)">${onlineCount} live</span> &bull; <span style="color:var(--accent-rose)">${offlineCount} offline</span>`;
     }
 
-    let channelScrollObserver = null;
     function renderChannels() {
         const container = elements.channelsContainer;
         container.innerHTML = '';
-        if (channelScrollObserver) { channelScrollObserver.disconnect(); channelScrollObserver = null; }
 
         if (state.displayedChannels.length === 0) {
             container.innerHTML = `
@@ -711,50 +736,39 @@
         wrapper.className = isGrid ? 'channels-grid' : 'channels-list-view';
         container.appendChild(wrapper);
 
-        // Virtualized render: keep only a window of cards in the DOM and append more
-        // as the user scrolls. Rendering all displayed channels at once (7000+ cards,
-        // each with an image/badges/buttons) froze scrolling and clicks.
-        const CHUNK = 60;
-        let cursor = 0;
-
-        const sentinel = document.createElement('div');
-        // covers the last 600px of the list (the wrapper is position:relative): the next chunk loads
-        // before the user reaches the end, and a fast scroll cannot jump over it
-        sentinel.style.cssText = 'position:absolute;left:0;bottom:0;height:600px;max-height:100%;width:1px;pointer-events:none;';
-        wrapper.appendChild(sentinel);
-
-        function appendChunk() {
-            const slice = state.displayedChannels.slice(cursor, cursor + CHUNK);
-            const frag = document.createDocumentFragment();
-            slice.forEach(channel => {
-                frag.appendChild(isGrid ? createChannelCard(channel) : createChannelListItem(channel));
-            });
-            wrapper.appendChild(frag);
-            cursor += slice.length;
-            // Health-check only the rows we actually rendered, so their Live/Offline
-            // badges populate and the Hide-Offline filter has real statuses to act on.
-            if (window.streamHealthChecker) window.streamHealthChecker.queueBatch(slice, slice.length);
-            if (!channelScrollObserver) return;
-            if (cursor >= state.displayedChannels.length) {
-                channelScrollObserver.disconnect();
-                channelScrollObserver = null;
-                sentinel.remove();
-            } else {
-                // re-observe: the observer only reports changes, and the sentinel may still be in view
-                channelScrollObserver.unobserve(sentinel);
-                channelScrollObserver.observe(sentinel);
-            }
+        // Keep the DOM bounded on phones, even after browsing thousands of channels.
+        const PAGE_SIZE = 60;
+        const pageCount = Math.ceil(state.displayedChannels.length / PAGE_SIZE);
+        state.guidePage = Math.min(state.guidePage || 0, pageCount - 1);
+        const start = state.guidePage * PAGE_SIZE;
+        const slice = state.displayedChannels.slice(start, start + PAGE_SIZE);
+        const frag = document.createDocumentFragment();
+        slice.forEach(channel => frag.appendChild(isGrid ? createChannelCard(channel) : createChannelListItem(channel)));
+        wrapper.appendChild(frag);
+        if (window.streamHealthChecker) {
+            window.streamHealthChecker.cancelAllPending();
+            window.streamHealthChecker.queueBatch(slice, slice.length);
         }
-
-        appendChunk(); // first visible window
-
-        if (cursor < state.displayedChannels.length) {
-            channelScrollObserver = new IntersectionObserver(entries => {
-                if (entries.some(e => e.isIntersecting)) appendChunk();
-            });
-            channelScrollObserver.observe(sentinel);
-        } else {
-            sentinel.remove();
+        if (pageCount > 1) {
+            const navigation = document.createElement('div');
+            navigation.className = 'guide-pagination';
+            const label = document.createElement('span');
+            label.textContent = `${start + 1}-${start + slice.length} of ${state.displayedChannels.length}`;
+            for (const [text, offset] of [['Previous', -1], ['Next', 1]]) {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'action-btn';
+                button.textContent = text;
+                button.disabled = state.guidePage + offset < 0 || state.guidePage + offset >= pageCount;
+                button.onclick = () => {
+                    state.guidePage += offset;
+                    renderChannels();
+                    container.scrollTop = 0;
+                };
+                navigation.appendChild(button);
+                if (offset === -1) navigation.appendChild(label);
+            }
+            container.appendChild(navigation);
         }
     }
 
@@ -822,7 +836,7 @@
             ${statusBadgeHtml}
             <div class="card-logo-shell">
                 ${logoUrl 
-                    ? `<img src="${logoUrl}" class="card-logo-img" alt="${channel.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='block';">
+                    ? `<img src="${logoUrl}" loading="lazy" decoding="async" class="card-logo-img" alt="${channel.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='block';">
                        <span style="display:none;font-weight:700;font-size:1.1rem;color:var(--accent-cyan);">${fallbackMonogram}</span>`
                     : `<span style="font-weight:700;font-size:1.1rem;color:var(--accent-cyan);">${fallbackMonogram}</span>`
                 }
@@ -902,7 +916,7 @@
                 </button>
                 <div class="card-logo-shell" style="width:38px;height:38px;">
                     ${logoUrl 
-                        ? `<img src="${logoUrl}" class="card-logo-img" alt="${channel.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='block';">
+                        ? `<img src="${logoUrl}" loading="lazy" decoding="async" class="card-logo-img" alt="${channel.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='block';">
                            <span style="display:none;font-size:0.8rem;color:var(--accent-cyan);">${fallbackMonogram}</span>`
                         : `<span style="font-size:0.8rem;color:var(--accent-cyan);">${fallbackMonogram}</span>`
                     }
@@ -952,8 +966,10 @@
     function setupHealthCheckerSubscription() {
         if (!window.streamHealthChecker) return;
 
+        let statsTimer;
         window.streamHealthChecker.subscribe((url, entry) => {
-            updateStats();
+            clearTimeout(statsTimer);
+            statsTimer = setTimeout(updateStats, 150);
 
             const cards = document.querySelectorAll(`[data-url="${CSS.escape(url)}"]`);
             cards.forEach(card => {
@@ -1044,18 +1060,18 @@
        -------------------------------------------------------------------------- */
     function playChannel(channel, serverIndex = 0, forceProxy = false, proxyIndex = 0, playback = null) {
         const requestId = ++state.playbackRequest;
+        clearTimeout(state.startupTimer);
+        window.streamHealthChecker?.setPaused?.(true);
+        if (state.hlsInstance) { state.hlsInstance.destroy(); state.hlsInstance = null; }
+        elements.video.pause();
+        elements.video.removeAttribute('src');
+        elements.video.onplaying = null;
         if (state.resolveController) state.resolveController.abort();
         state.resolveController = null;
         elements.video.onerror = null;
         elements.video.onloadedmetadata = null;
         state.currentChannel = channel;
         state.currentServerIndex = serverIndex;
-
-        // On a fresh open, start from the proxy that worked for this channel last time
-        if (!forceProxy && proxyIndex === 0 && channel && channel._proxyIndex) {
-            proxyIndex = channel._proxyIndex;
-            forceProxy = proxyIndex !== 0;
-        }
 
         // Hide geo-alert
         if (elements.geoAlertBanner) elements.geoAlertBanner.style.display = 'none';
@@ -1100,6 +1116,36 @@
         const streamUrl = playback ? playback.url : currentServer.url;
         state.activePlaybackUrl = /^https?:\/\//i.test(streamUrl || '') ? streamUrl : null;
         const isLocalStream = !!window.SmartProxyEngine?.isPrivateUrl?.(streamUrl);
+        let failed = false;
+        function advanceServer(reason, allowProxy = true) {
+            if (requestId !== state.playbackRequest || failed) return;
+            failed = true;
+            clearTimeout(state.startupTimer);
+            // Try one useful proxy route, then the next mirror instead of cycling public proxies.
+            if (allowProxy && !isLocalStream && !forceProxy && state.routingMode !== 'direct'
+                && !window.SmartProxyEngine?.shouldRouteThroughProxy(streamUrl)) {
+                playChannel(channel, serverIndex, true, 0, playback);
+                return;
+            }
+            if (serverIndex + 1 < servers.length) {
+                elements.currentChannelStatus.textContent = `Trying server ${serverIndex + 2} of ${servers.length}...`;
+                playChannel(channel, serverIndex + 1);
+                return;
+            }
+            if (state.hlsInstance) { state.hlsInstance.destroy(); state.hlsInstance = null; }
+            elements.video.pause();
+            elements.currentChannelStatus.textContent = isLocalStream
+                ? 'Local stream unavailable. Check network access and browser permissions below, then tap Reload.'
+                : `No playable server found (${servers.length} tried). ${reason}`;
+            if (isLocalStream && localHelp) localHelp.open = true;
+        }
+        const startupBudget = isLocalStream ? 20000 : (channel.type === 'web' || channel.type === 'feed') ? 35000 : 10000;
+        state.startupTimer = setTimeout(() => advanceServer('Playback did not start in time.'), startupBudget);
+        elements.video.onplaying = () => {
+            if (requestId !== state.playbackRequest) return;
+            clearTimeout(state.startupTimer);
+            elements.currentChannelStatus.textContent = 'Stream Live';
+        };
         const localHelp = document.getElementById('local-network-help');
         if (localHelp) localHelp.hidden = !isLocalStream;
 
@@ -1111,7 +1157,7 @@
             elements.playerScreenServers.style.display = 'flex';
             elements.playerScreenServerButtons.innerHTML = servers.map((srv, idx) => `
                 <button type="button" class="screen-srv-btn ${idx === serverIndex ? 'active' : ''}" data-screen-srv="${idx}">
-                    ${srv.name.replace(/\(.*?\)/, '').trim() || 'Server ' + (idx + 1)}
+                    ${(srv.name || '').replace(/\(.*?\)/, '').trim() || 'Server ' + (idx + 1)}
                 </button>
             `).join('');
 
@@ -1151,6 +1197,7 @@
             elements.video.style.display = 'none';
             elements.sportsIframe.style.display = 'block';
             elements.sportsIframe.src = streamUrl;
+            clearTimeout(state.startupTimer);
             elements.routingBadge.textContent = 'Web Feed';
             elements.currentChannelStatus.textContent = 'Embedded feed page';
             return;
@@ -1172,6 +1219,7 @@
                     elements.video.style.display = 'none';
                     elements.sportsIframe.style.display = 'block';
                     elements.sportsIframe.src = streamUrl;
+                    clearTimeout(state.startupTimer);
                     elements.routingBadge.textContent = 'Web Feed';
                     elements.currentChannelStatus.textContent = 'Embedded player';
                 });
@@ -1183,6 +1231,7 @@
             elements.video.style.display = 'none';
             elements.sportsIframe.style.display = 'block';
             elements.sportsIframe.src = streamUrl;
+            clearTimeout(state.startupTimer);
             elements.routingBadge.innerHTML = '🌐 Web Feed';
             elements.currentChannelStatus.innerHTML = '<span class="live-pulse-dot"></span> Live Broadcast';
             return;
@@ -1200,7 +1249,7 @@
             elements.currentChannelStatus.innerHTML = '<span style="color:var(--accent-amber)">Resolving stream…</span>';
             const controller = new AbortController();
             state.resolveController = controller;
-            window.SmartProxyEngine.resolveStream(catId, controller.signal).then(r => {
+            window.SmartProxyEngine.resolveStream(catId, controller.signal, currentServer.catalogVariant).then(r => {
                 if (requestId !== state.playbackRequest) return;
                 const headers = r.headers || {};
                 const requiresHeaders = !!(headers.referer || headers.origin || headers.userAgent);
@@ -1208,7 +1257,7 @@
             }).catch(e => {
                 if (requestId !== state.playbackRequest || controller.signal.aborted) return;
                 elements.currentChannelStatus.textContent = 'Resolve failed: ' + e.message;
-                if (serverIndex + 1 < servers.length) playChannel(channel, serverIndex + 1);
+                advanceServer('Stream resolution failed.', false);
             });
             return;
         }
@@ -1244,7 +1293,16 @@
                 loader: CustomLoader,
                 enableWorker: true,
                 lowLatencyMode: true,
-                backBufferLength: 60
+                backBufferLength: 15,
+                maxBufferLength: 15,
+                maxMaxBufferLength: 30,
+                capLevelToPlayerSize: true,
+                manifestLoadingTimeOut: 7000,
+                manifestLoadingMaxRetry: 0,
+                levelLoadingTimeOut: 7000,
+                levelLoadingMaxRetry: 1,
+                fragLoadingTimeOut: 8000,
+                fragLoadingMaxRetry: 1
             };
 
             const hls = new Hls(hlsConfig);
@@ -1255,10 +1313,12 @@
 
             hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
                 if (requestId !== state.playbackRequest) return;
-                elements.currentChannelStatus.innerHTML = '<span class="live-pulse-dot"></span> Stream Live';
-                if (channel) channel._proxyIndex = proxyIndex; // remember the route that worked
-                elements.video.play().catch(() => {
-                    console.log('Autoplay blocked by browser; user interaction required');
+                elements.currentChannelStatus.textContent = 'Starting playback...';
+                elements.video.play().catch(error => {
+                    if (requestId !== state.playbackRequest) return;
+                    if (error.name !== 'NotAllowedError') { advanceServer('Video could not start.'); return; }
+                    clearTimeout(state.startupTimer);
+                    elements.currentChannelStatus.textContent = 'Tap Play to start this stream.';
                 });
                 populateQualityLevels(data.levels);
             });
@@ -1271,97 +1331,11 @@
                 }
             });
 
-            hls.on(Hls.Events.ERROR, async (event, data) => {
+            hls.on(Hls.Events.ERROR, (event, data) => {
                 if (requestId !== state.playbackRequest) return;
-                // A direct public stream hit a network error (segment blocked by CORS or mixed content):
-                // hls.js would retry for ~30s before giving up, so switch to the proxy straight away.
-                const isPublic = !(window.SmartProxyEngine && window.SmartProxyEngine.isPrivateUrl(streamUrl));
-                if (!data.fatal && !needProxy && isPublic && state.routingMode !== 'direct' && data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-                    playChannel(channel, serverIndex, true, 0);
-                    return;
-                }
-                if (data.fatal) {
-                    console.warn('HLS Error on Server', serverIndex, ':', data.type, data.details, data);
-
-                    // Auto-refresh token for FTV local stream if token expired (HTTP 403 / 404)
-                    if (streamUrl.includes('172.16.15.5')) {
-                        const ftvMatch = streamUrl.match(/172\.16\.15\.5:8666\/([^/]+)\//);
-                        const streamId = ftvMatch ? ftvMatch[1] : null;
-                        if (streamId) {
-                            try {
-                                elements.currentChannelStatus.innerHTML = '<span style="color:var(--accent-cyan)">Refreshing local FTV token...</span>';
-                                const ftvRes = await fetch(`http://172.16.15.5/play.php?stream=${encodeURIComponent(streamId)}`);
-                                if (ftvRes.ok) {
-                                    const ftvHtml = await ftvRes.text();
-                                    const srcMatch = ftvHtml.match(/var videoSrc = ['"]([^'"]+)['"]/);
-                                    if (srcMatch && srcMatch[1] && srcMatch[1] !== streamUrl) {
-                                        currentServer.url = srcMatch[1];
-                                        hls.loadSource(srcMatch[1]);
-                                        hls.startLoad();
-                                        return;
-                                    }
-                                }
-                            } catch (e) {
-                                console.warn('FTV token refresh failed:', e.message);
-                            }
-                        }
-                    }
-
-                    // Detect HTTP error code from HLS error data
-                    if (isLocalStream) {
-                        elements.currentChannelStatus.textContent = 'Local stream unavailable. Check network access and browser permissions below, then tap Reload.';
-                        if (localHelp) localHelp.open = true;
-                        return;
-                    }
-                    const httpCode = data.response && data.response.code ? data.response.code : 0;
-                    const isDeadLink = httpCode === 404 || httpCode === 410;
-                    const isGeoBlocked = httpCode === 403 || httpCode === 451;
-
-                    // Step 1: Direct failed -> Retry Cloudflare Proxy (only if not a dead link)
-                    if (!needProxy && !isDeadLink) {
-                        playChannel(channel, serverIndex, true, 0);
-                        return;
-                    }
-
-                    // Auto-failover across every proxy before giving up (not just one).
-                    const CFG = window.SmartProxyEngine ? window.SmartProxyEngine.CONFIG : {};
-                    // Step 2: primary worker(0) failed -> your custom/regional proxy(3) if set, else global(1)
-                    if (needProxy && proxyIndex === 0 && !isDeadLink) {
-                        playChannel(channel, serverIndex, true, CFG.customProxy ? 3 : 1);
-                        return;
-                    }
-                    // Step 2b: custom/regional proxy(3) failed -> global CORS proxy(1)
-                    if (needProxy && proxyIndex === 3 && !isDeadLink) {
-                        playChannel(channel, serverIndex, true, 1);
-                        return;
-                    }
-                    // Step 2c: global proxy(1) failed -> secondary global proxy(2)
-                    if (needProxy && proxyIndex === 1 && !isDeadLink) {
-                        playChannel(channel, serverIndex, true, 2);
-                        return;
-                    }
-
-                    // Step 3: All proxies on this mirror failed -> If another server mirror exists, auto-failover!
-                    if (servers.length > serverIndex + 1) {
-                        const nextIdx = serverIndex + 1;
-                        elements.currentChannelStatus.innerHTML = `<span style="color:var(--accent-amber)">Auto-switching to Server ${nextIdx + 1}...</span>`;
-                        setTimeout(() => {
-                            if (requestId === state.playbackRequest) playChannel(channel, nextIdx);
-                        }, 800);
-                        return;
-                    }
-
-                    // Step 4: Determine error type and show appropriate message
-                    if (isDeadLink) {
-                        elements.currentChannelStatus.innerHTML = '<span style="color:var(--accent-rose)">🔗 Stream URL Expired / Not Found (404)</span>';
-                        showStreamErrorBanner(channel, servers, 'dead');
-                    } else if (isGeoBlocked) {
-                        elements.currentChannelStatus.innerHTML = '<span style="color:var(--accent-rose)">🌍 Stream Geo-Blocked (403 Forbidden)</span>';
-                        showStreamErrorBanner(channel, servers, 'geo');
-                    } else {
-                        elements.currentChannelStatus.innerHTML = '<span style="color:var(--accent-rose)">⚠️ Stream Unavailable — CORS or Network Error</span>';
-                        showStreamErrorBanner(channel, servers, 'cors');
-                    }
+                if (data.fatal || data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                    const code = data.response?.code || 0;
+                    advanceServer(`Stream request failed${code ? ' (HTTP ' + code + ')' : ''}.`, ![404, 410].includes(code));
                 }
             });
         } 
@@ -1374,26 +1348,17 @@
             elements.video.src = playUrl;
             // assigned, not added: each channel switch replaces the previous channel's handlers
             elements.video.onloadedmetadata = () => {
-                elements.currentChannelStatus.innerHTML = '<span class="live-pulse-dot"></span> Stream Live';
-                elements.video.play().catch(() => {});
+                if (requestId !== state.playbackRequest) return;
+                elements.currentChannelStatus.textContent = 'Starting playback...';
+                elements.video.play().catch(error => {
+                    if (requestId !== state.playbackRequest) return;
+                    if (error.name !== 'NotAllowedError') { advanceServer('Video could not start.'); return; }
+                    clearTimeout(state.startupTimer);
+                    elements.currentChannelStatus.textContent = 'Tap Play to start this stream.';
+                });
             };
 
-            elements.video.onerror = () => {
-                if (requestId !== state.playbackRequest) return;
-                if (isLocalStream) {
-                    elements.currentChannelStatus.textContent = 'Local stream unavailable. Check network access and browser permissions below, then tap Reload.';
-                    if (localHelp) localHelp.open = true;
-                    return;
-                }
-                if (!needProxy) {
-                    playChannel(channel, serverIndex, true, 0);
-                } else if (servers.length > serverIndex + 1) {
-                    playChannel(channel, serverIndex + 1);
-                } else {
-                    elements.currentChannelStatus.innerHTML = '<span style="color:var(--accent-rose)">⚠️ Stream unavailable</span>';
-                    showStreamErrorBanner(channel, servers, 'unknown');
-                }
-            };
+            elements.video.onerror = () => advanceServer('Stream request failed.');
         }
 
         startDiagnosticsTimer();
@@ -1779,14 +1744,17 @@
             if (ch && ch.type !== 'web' && (elements.video.paused || elements.video.readyState < 3)) playChannel(ch, state.currentServerIndex);
         });
 
+        let searchTimer;
         // Search Input
         elements.searchInput.addEventListener('input', (e) => {
             state.searchQuery = e.target.value;
             elements.searchClearBtn.style.display = state.searchQuery ? 'block' : 'none';
-            applyFiltersAndRender();
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(applyFiltersAndRender, 120);
         });
 
         elements.searchClearBtn.addEventListener('click', () => {
+            clearTimeout(searchTimer);
             elements.searchInput.value = '';
             state.searchQuery = '';
             elements.searchClearBtn.style.display = 'none';

@@ -37,7 +37,7 @@ jobs:
           cache-dependency-path: tools/package-lock.json
       - run: npm ci --prefix tools --ignore-scripts
       - name: Test resolver, player and Cloudflare capture behavior
-        run: node --test tests/resolver.test.cjs tests/playback.test.cjs tools/cloudflare-sniffer.test.mjs
+        run: node --test tests/resolver.test.cjs tests/playback.test.cjs tests/health-checker.test.cjs tools/cloudflare-sniffer.test.mjs
       - name: Validate both deployment bundles
         run: npm run check:deploy --prefix tools
       - name: Deploy on main when account secrets are configured
