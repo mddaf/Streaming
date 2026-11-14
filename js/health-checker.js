@@ -12,7 +12,7 @@ class StreamHealthChecker {
         this.concurrency = options.concurrency || 4;
         this.timeoutMs = options.timeoutMs || 4000;
         this.cacheTTL = options.cacheTTL || 15 * 60 * 1000; // 15 minutes
-        this.cacheKey = 'stream_health_cache_v2';
+        this.cacheKey = 'stream_health_cache_v3';
 
         this.cache = new Map();
         this.queue = [];
@@ -287,9 +287,11 @@ class StreamHealthChecker {
             this.notifyChange(mainUrl, { status: 'checking', url: mainUrl });
 
             let entry = null;
+            let hasAlternatives = channel.servers?.length > 1;
             try {
                 if (window.SmartProxyEngine && typeof window.SmartProxyEngine.resolveStream === 'function') {
                     const resolved = await window.SmartProxyEngine.resolveStream(catId, checkSignal);
+                    hasAlternatives ||= resolved?.variants?.length > 1;
                     if (resolved && resolved.type === 'web') {
                         entry = { status: 'unknown', code: 0, reason: 'Embedded feed page; video availability is not verified', timestamp: Date.now() };
                     } else if (resolved && resolved.url) {
@@ -309,6 +311,9 @@ class StreamHealthChecker {
             }
 
             if (mainController.signal.aborted) return;
+            if (entry?.status === 'offline' && hasAlternatives) {
+                entry = { status: 'unknown', code: entry.code || 0, reason: 'First source unavailable; select the channel to try its alternatives', timestamp: Date.now(), ttl: 30000 };
+            }
             if (!entry) {
                 entry = { status: 'offline', code: 0, reason: 'Health check failed', timestamp: Date.now() };
             }
@@ -342,6 +347,8 @@ class StreamHealthChecker {
                     if (checkSignal.aborted) break;
                     const mirror = channel.servers[i];
                     if (!mirror.url || mirror.url === mainUrl) continue;
+                    // Catalog mirrors need resolution at playback; a URL scheme is not a media endpoint.
+                    if (mirror.isCatalog || mirror.url.startsWith('catalog://')) continue;
 
                     const mirrorResult = await this.probeSingleUrl(mirror.url, 2000, mirror.headers || channel.headers, checkSignal);
                     if (!mirrorResult) break;
@@ -359,7 +366,10 @@ class StreamHealthChecker {
                 }
 
                 if (!foundWorkingMirror) {
-                    entry = { ...primaryResult, timestamp: Date.now() };
+                    const hasCatalogMirror = channel.servers.some(server => server.isCatalog || server.url?.startsWith('catalog://'));
+                    entry = hasCatalogMirror
+                        ? { status: 'unknown', code: 0, reason: 'Select the channel to resolve its catalog alternatives', timestamp: Date.now() }
+                        : { ...primaryResult, timestamp: Date.now() };
                 }
             } else {
                 entry = { ...primaryResult, timestamp: Date.now() };

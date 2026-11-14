@@ -329,8 +329,7 @@
         return name.toLowerCase()
             .replace(/\s*\(\d+p\)/g, '')
             .replace(/\s*\[.*?\]/g, '')
-            .replace(/hd$/i, '')
-            .replace(/fhd$/i, '')
+            .replace(/\s*(?:uhd|fhd|hd)\s*$/i, '')
             .replace(/[^a-z0-9]/g, '')
             .trim();
     }
@@ -495,7 +494,7 @@
 
                     if (!mergedMap.has(normKey)) {
                         // First occurrence: create channel entry with Server 1
-                        ch.servers = [{ name: `Server 1 (${src.name})`, url: ch.url }];
+                            ch.servers = [{ name: `Server 1 (${src.name})`, url: ch.url, headers: ch.headers }];
                         ch.sources = [src.name];
                         mergedMap.set(normKey, ch);
                     } else {
@@ -505,7 +504,7 @@
                         if (!alreadyHasUrl) {
                             existing.servers.push({
                                 name: `Server ${existing.servers.length + 1} (${src.name})`,
-                                url: ch.url
+                                    url: ch.url, headers: ch.headers
                             });
                             if (!existing.sources.includes(src.name)) {
                                 existing.sources.push(src.name);
@@ -566,6 +565,8 @@
             });
 
         const guide = Array.from(mergedMap.values());
+        // Try public catalog mirrors before LAN-only playlists on ordinary channel clicks.
+        guide.forEach(channel => channel.servers?.sort((a, b) => Number(!!b.isCatalog) - Number(!!a.isCatalog)));
         const catalogChannelsFirst = guide.filter(channel => channel.servers?.some(server => server.isCatalog));
         const otherChannels = guide.filter(channel => !channel.servers?.some(server => server.isCatalog));
         return [...catalogChannelsFirst, ...otherChannels];
@@ -1116,13 +1117,14 @@
         const streamUrl = playback ? playback.url : currentServer.url;
         state.activePlaybackUrl = /^https?:\/\//i.test(streamUrl || '') ? streamUrl : null;
         const isLocalStream = !!window.SmartProxyEngine?.isPrivateUrl?.(streamUrl);
+        let usingProxy = forceProxy;
         let failed = false;
         function advanceServer(reason, allowProxy = true) {
             if (requestId !== state.playbackRequest || failed) return;
             failed = true;
             clearTimeout(state.startupTimer);
             // Try one useful proxy route, then the next mirror instead of cycling public proxies.
-            if (allowProxy && !isLocalStream && !forceProxy && state.routingMode !== 'direct'
+            if (allowProxy && /^https?:/i.test(streamUrl || '') && !isLocalStream && !usingProxy && state.routingMode !== 'direct'
                 && !window.SmartProxyEngine?.shouldRouteThroughProxy(streamUrl)) {
                 playChannel(channel, serverIndex, true, 0, playback);
                 return;
@@ -1133,13 +1135,16 @@
                 return;
             }
             if (state.hlsInstance) { state.hlsInstance.destroy(); state.hlsInstance = null; }
+            state.resolveController?.abort();
             elements.video.pause();
+            elements.video.removeAttribute('src');
             elements.currentChannelStatus.textContent = isLocalStream
                 ? 'Local stream unavailable. Check network access and browser permissions below, then tap Reload.'
                 : `No playable server found (${servers.length} tried). ${reason}`;
             if (isLocalStream && localHelp) localHelp.open = true;
         }
-        const startupBudget = isLocalStream ? 20000 : (channel.type === 'web' || channel.type === 'feed') ? 35000 : 10000;
+        const startupBudget = (channel.type === 'web' || channel.type === 'feed') ? 35000
+            : String(streamUrl || '').startsWith('catalog://') ? 10000 : 20000;
         state.startupTimer = setTimeout(() => advanceServer('Playback did not start in time.'), startupBudget);
         elements.video.onplaying = () => {
             if (requestId !== state.playbackRequest) return;
@@ -1250,14 +1255,27 @@
             const controller = new AbortController();
             state.resolveController = controller;
             window.SmartProxyEngine.resolveStream(catId, controller.signal, currentServer.catalogVariant).then(r => {
-                if (requestId !== state.playbackRequest) return;
+                if (requestId !== state.playbackRequest || failed) return;
+                // CRICFy reveals individual sources only after its detail response is decoded.
+                if (Array.isArray(r.variants) && r.variant != null) {
+                    currentServer.catalogVariant = r.variant;
+                    for (const variant of r.variants.slice(0, 32)) {
+                        if (!Number.isInteger(variant.index) || variant.index < 0) continue;
+                        if (servers.some(server => server.catalogId === catId && server.catalogVariant === variant.index)) continue;
+                        servers.push({ ...currentServer, name: 'Source ' + (variant.index + 1), catalogVariant: variant.index });
+                    }
+                    channel.servers = servers;
+                }
                 const headers = r.headers || {};
                 const requiresHeaders = !!(headers.referer || headers.origin || headers.userAgent);
                 playChannel(channel, serverIndex, forceProxy || requiresHeaders, proxyIndex, r);
             }).catch(e => {
                 if (requestId !== state.playbackRequest || controller.signal.aborted) return;
                 elements.currentChannelStatus.textContent = 'Resolve failed: ' + e.message;
-                advanceServer('Stream resolution failed.', false);
+                const detail = /DRM|stream type: 7/i.test(e.message || '')
+                    ? 'The source requires DRM playback that this player does not support.'
+                    : 'Stream resolution failed: ' + String(e.message || 'upstream unavailable').slice(0, 220);
+                advanceServer(detail, false);
             });
             return;
         }
@@ -1267,8 +1285,11 @@
         elements.sportsIframe.style.display = 'none';
         elements.video.style.display = 'block';
 
-        if (window.SmartProxyEngine) window.SmartProxyEngine.setStreamHeaders(playback?.headers || currentServer.headers || channel.headers);
-        const needProxy = !isLocalStream && (forceProxy || (window.SmartProxyEngine && window.SmartProxyEngine.shouldRouteThroughProxy(streamUrl)));
+        const playbackHeaders = playback?.headers || currentServer.headers || channel.headers;
+        if (window.SmartProxyEngine) window.SmartProxyEngine.setStreamHeaders(playbackHeaders);
+        const headerProxy = state.routingMode !== 'direct' && !!(playbackHeaders?.referer || playbackHeaders?.origin || playbackHeaders?.userAgent);
+        const needProxy = !isLocalStream && (forceProxy || headerProxy || (window.SmartProxyEngine && window.SmartProxyEngine.shouldRouteThroughProxy(streamUrl)));
+        usingProxy = needProxy;
 
         // Update routing badge
         elements.routingBadge.innerHTML = needProxy 
@@ -1297,11 +1318,11 @@
                 maxBufferLength: 15,
                 maxMaxBufferLength: 30,
                 capLevelToPlayerSize: true,
-                manifestLoadingTimeOut: 7000,
+                manifestLoadingTimeOut: 10000,
                 manifestLoadingMaxRetry: 0,
-                levelLoadingTimeOut: 7000,
+                levelLoadingTimeOut: 10000,
                 levelLoadingMaxRetry: 1,
-                fragLoadingTimeOut: 8000,
+                fragLoadingTimeOut: 15000,
                 fragLoadingMaxRetry: 1
             };
 
@@ -1333,9 +1354,15 @@
 
             hls.on(Hls.Events.ERROR, (event, data) => {
                 if (requestId !== state.playbackRequest) return;
-                if (data.fatal || data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-                    const code = data.response?.code || 0;
-                    advanceServer(`Stream request failed${code ? ' (HTTP ' + code + ')' : ''}.`, ![404, 410].includes(code));
+                const code = data.response?.code || 0;
+                // hls.js retries recoverable segment errors; switching on every warning
+                // discarded otherwise playable live sources before those retries could finish.
+                if (data.fatal || [403, 404, 410, 525, 526].includes(code)) {
+                    const reason = [525, 526].includes(code)
+                        ? `The upstream server's TLS connection failed (HTTP ${code}).`
+                        : /timeout/i.test(data.details || '') ? 'The upstream playlist or media segment timed out.'
+                        : `Stream request failed${code ? ' (HTTP ' + code + ')' : ''}.`;
+                    advanceServer(reason, ![404, 410, 525, 526].includes(code));
                 }
             });
         } 

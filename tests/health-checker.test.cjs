@@ -10,7 +10,9 @@ function checker(fetch) {
     } }, fetch, AbortController, AbortSignal, TextDecoder, setTimeout, clearTimeout,
     sessionStorage: { getItem() {}, setItem() {} }, console });
     vm.runInContext(fs.readFileSync('js/health-checker.js', 'utf8'), context);
-    return context.window.streamHealthChecker;
+    const health = context.window.streamHealthChecker;
+    health.engine = context.window.SmartProxyEngine;
+    return health;
 }
 
 test('health probes cancel a server that ignores Range instead of downloading an endless live stream', async () => {
@@ -62,4 +64,23 @@ test('local and embedded channels never trigger background network access', asyn
     clearTimeout(health.persistTimer);
     assert.equal(calls, 0);
     assert.equal(health.getStatus('http://192.168.1.2/live.m3u8'), 'local');
+});
+
+test('a failed first catalog source does not hide a channel with untested alternatives', async () => {
+    const health = checker(async () => new Response('', { status: 404 }));
+    health.engine.resolveStream = async () => ({ url: 'https://dead.test/live.m3u8', variants: [{ index: 0 }, { index: 1 }] });
+    await health.performCheck({ url: 'catalog://cricfy:33', catalogId: 'cricfy:33' });
+    clearTimeout(health.persistTimer);
+    assert.equal(health.getStatus('catalog://cricfy:33'), 'unknown');
+});
+
+test('background mirror checks never send catalog:// URLs to the media proxy', async () => {
+    const calls = [];
+    const health = checker(async url => { calls.push(url); return new Response('', { status: 404 }); });
+    await health.performCheck({ url: 'https://dead.test/live.m3u8', servers: [
+        { url: 'https://dead.test/live.m3u8' }, { url: 'catalog://hdstreamz:1035', isCatalog: true }
+    ] });
+    clearTimeout(health.persistTimer);
+    assert.ok(!calls.some(url => url.includes('catalog')));
+    assert.equal(health.getStatus('https://dead.test/live.m3u8'), 'unknown');
 });

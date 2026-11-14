@@ -6,7 +6,7 @@ const nodeCrypto = require('node:crypto');
 
 function worker(routes = {}) {
     const calls = [];
-    const context = vm.createContext({ URL, URLSearchParams, Headers, Request, Response, AbortSignal, atob, TextDecoder, crypto: nodeCrypto.webcrypto,
+    const context = vm.createContext({ URL, URLSearchParams, Headers, Request, Response, AbortSignal, AbortController, atob, TextDecoder, setTimeout, clearTimeout, crypto: nodeCrypto.webcrypto,
         fetch: async (url, options) => {
             calls.push({ url, options });
             const result = routes[url];
@@ -266,4 +266,45 @@ test('catalog source variants resolve exactly the selected HD quality and reject
     assert.ok(!calls.some(call => call.url.includes('quality=0')));
     const invalid = await context.handleResolve(new Request('https://worker.test/resolve?id=hdstreamz:7&variant=9'), env);
     assert.equal(invalid.status, 400);
+});
+
+test('CRICFy exposes supported alternatives and resolves the selected stream rather than returning the first again', async () => {
+    const api = 'https://catalog.test/channels/sports.txt';
+    const { context } = worker({ [api]: { body: { streamUrls: [
+        { type: 0, link: 'http://dead.test/live.m3u8' },
+        { type: 7, link: 'https://licensed.test/live.mpd' },
+        { type: 0, link: 'https://backup.test/live.m3u8' }
+    ] } } });
+    const first = await context.resolveChannel({ type: 'channel-item', api });
+    assert.equal(first.variant, 0);
+    assert.deepEqual(Array.from(first.variants, v => v.index), [0, 2]);
+    const backup = await context.resolveChannel({ type: 'channel-item', api, streamVariant: 2 });
+    assert.equal(backup.url, 'https://backup.test/live.m3u8');
+    assert.equal(backup.variant, 2);
+});
+
+test('proxy URL extraction preserves signed percent escapes and separates wrapper headers', () => {
+    const { context } = worker();
+    const signed = 'https://cdn.test/live.m3u8?sig=a%2Fb%2Bc%3D&name=a+b';
+    assert.equal(context.extractTargetUrl('https://proxy.test/?' + signed), signed);
+    assert.equal(context.extractTargetUrl('https://proxy.test/?' + encodeURIComponent(signed)), signed);
+    assert.equal(context.extractTargetUrl('https://proxy.test/?url=' + encodeURIComponent(signed) + '&ref=https%3A%2F%2Fplayer.test%2F'), signed);
+});
+
+test('proxy derives Origin from the referer origin and does not read HEAD bodies', async () => {
+    const target = 'https://cdn.test/live.m3u8';
+    const { context, calls } = worker({ [target]: '#EXTM3U\nsegment.ts' });
+    const response = await context.handleProxyRequest(new Request('https://proxy.test/?ref=' + encodeURIComponent('https://player.test/embed/7') + '&url=' + encodeURIComponent(target), { method: 'HEAD' }));
+    assert.equal(response.status, 200);
+    assert.equal(await response.text(), '');
+    assert.equal(calls[0].options.headers.get('Origin'), 'https://player.test');
+});
+
+test('manifest readers reject excessive bodies and cancel stalled readers', async () => {
+    const { context } = worker();
+    await assert.rejects(context.readTextBounded(new Response('123456'), 4, 100), /size limit/);
+    let canceled = false;
+    const response = new Response(new ReadableStream({ cancel() { canceled = true; } }));
+    await assert.rejects(context.readTextBounded(response, 1024, 10), /timed out/);
+    assert.equal(canceled, true);
 });

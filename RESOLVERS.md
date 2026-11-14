@@ -11,7 +11,7 @@ is an alternative for other hosting environments.
 | --- | --- |
 | `GET /catalog` | Public channel metadata, merged into the website guide |
 | `GET /resolve?id=CHANNEL_ID` | Fresh `{url, headers}` from the channel's resolver chain |
-| `GET /resolve?id=CHANNEL_ID&variant=INDEX` | One selected HD Streamz source quality; indexes come from public catalog `variants` |
+| `GET /resolve?id=CHANNEL_ID&variant=INDEX` | A selected source; HD Streamz indexes come from public catalog `variants`, CRICFy indexes from its first resolution response |
 | `GET /sniff?url=ENCODED_EMBED_URL` | First verified HLS manifest discovered in an embed page |
 | `GET /feed` | Current SportzFY `livetv` page URL from its remote configuration |
 | `GET /sources` | CRICFy and HD Streamz catalog availability, fetch errors and sniffer configuration status |
@@ -137,11 +137,17 @@ Cloudflare setup uses `tools/cloudflare-sniffer.mjs` and the proxy's
 Channel switching cancels pending browser requests and ignores stale results.
 The player tries each server in order, with one primary proxy retry when useful,
 and advances when startup fails or takes too long. Ordinary source attempts have
-a ten-second startup budget; local sources get twenty seconds and web/feed
-discovery gets thirty-five. Successful playback stops the startup timer. HD
+a ten-second resolution budget followed by twenty seconds for media startup;
+web/feed discovery gets thirty-five. Successful playback stops the startup timer. HD
 Streamz qualities are separate server choices, so an unreachable first link
 does not prevent trying the remaining supported sources. Browser autoplay
 permission failures show a Play instruction instead of skipping a source.
+CRICFy detail responses expose supported stream variants to the player as well.
+Recoverable HLS warnings keep the library's retry behavior; definitive HTTP
+failures and fatal errors advance to another source. TLS 525/526 responses
+are reported as upstream TLS failures. The site cannot repair the provider's TLS.
+Public catalog mirrors are tried before LAN-only playlist mirrors. Each mirror
+retains its own playback headers. Signed query parameters are decoded once.
 
 The guide renders sources as they arrive, prioritizes Worker catalog channels,
 and pages results sixty cards at a time to keep the mobile DOM bounded. Search
@@ -150,6 +156,11 @@ read at most the first 8 KiB of each response and cancel its body. Their timeout
 cover response bodies, too. Selecting a stream pauses and cancels background
 probes so playback has priority. Availability badges indicate reachable media
 endpoints; they do not establish that video frames will play.
+Failure of the first source leaves channels with untested alternatives marked
+unknown, so Hide Offline does not incorrectly remove them.
+
+See [the live-host verification results](./LIVE_CHECKS.md) for observed playback
+and upstream failures. Those checks are a sample, not a catalogue-wide guarantee.
 
 Headerless resolved streams use direct-first routing; sources requiring playback
 headers use the proxy. This preserves the viewer's region for public HLS feeds.

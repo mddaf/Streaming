@@ -63,21 +63,16 @@ function buildHeaderQS(headers) {
  */
 function unwrapProxyUrl(url) {
     if (!url) return '';
-    if (url.includes('workers.dev/?') || url.includes('corsproxy.io/?') || url.includes('allorigins.win')) {
-        const parts = url.split('?');
-        if (parts.length > 1) {
-            let rest = parts.slice(1).join('?');
-            // New Worker form carries header overrides before the target: ...&url=<encoded>.
-            // The encoded target has no literal '&url=' of its own, so match our param only.
-            const m = rest.match(/(?:^|&)url=(.*)$/);
-            if (m) rest = m[1];
-            try {
-                return decodeURIComponent(rest);
-            } catch (e) {
-                return rest;
-            }
-        }
-    }
+    try {
+        const parsed = new URL(url);
+        const configured = [PROXY_CONFIG.primary, ...PROXY_CONFIG.fallbacks, PROXY_CONFIG.customProxy]
+            .filter(Boolean).some(base => { try { return new URL(base).origin === parsed.origin; } catch (_) { return false; } });
+        if (!configured) return url;
+        if (parsed.searchParams.has('url')) return parsed.searchParams.get('url');
+        const target = parsed.search.slice(1);
+        if (/^https?%3a/i.test(target)) return decodeURIComponent(target);
+        if (/^https?:/i.test(target)) return target;
+    } catch (_) { /* leave unrelated URLs untouched */ }
     return url;
 }
 

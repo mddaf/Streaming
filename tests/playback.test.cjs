@@ -111,6 +111,34 @@ test('catalog qualities become separate mirrors and resolver failures advance to
     assert.equal(pending[1].variant, 1);
 });
 
+test('CRICFy discovered alternatives are tried after an unusable first stream without duplicates', async () => {
+    const { playChannel, pending, nodes } = app();
+    const channel = catalog('cricfy:33');
+    playChannel(channel);
+    pending[0].resolve({ url: 'http://cdn.test/first.m3u8', variant: 0, variants: [{ index: 0 }, { index: 2 }], headers: {} });
+    await flush();
+    assert.equal(channel.servers.length, 2);
+    nodes.get('main-video').onerror();
+    nodes.get('main-video').onerror();
+    assert.equal(pending.at(-1).variant, 2);
+    pending.at(-1).resolve({ url: 'https://cdn.test/backup.m3u8', variant: 2, variants: [{ index: 0 }, { index: 2 }], headers: {} });
+    await flush();
+    assert.equal(channel.servers.length, 2);
+});
+
+test('a terminal resolution timeout aborts the request and ignores a late resolver result', async () => {
+    const { playChannel, pending, state, timers, nodes } = app();
+    const channel = catalog('slow');
+    playChannel(channel);
+    // Resolver requests must advance servers, never retry catalog:// as a media URL.
+    timers.get(state.startupTimer).callback();
+    assert.equal(pending.length, 1);
+    assert.equal(pending[0].signal.aborted, true);
+    pending[0].resolve({ url: 'https://cdn.test/late.m3u8', headers: {} });
+    await flush();
+    assert.notEqual(nodes.get('main-video').src, 'https://cdn.test/late.m3u8');
+});
+
 test('fatal HLS failures advance mirrors and destroy the previous player', () => {
     const instances = [];
     class FakeHls {
@@ -122,7 +150,7 @@ test('fatal HLS failures advance mirrors and destroy the previous player', () =>
         on(event, handler) { this.events[event] = handler; }
         loadSource() {} attachMedia() {} destroy() { this.destroyed = true; }
     }
-    const { playChannel, engine, state } = app(FakeHls);
+    const { playChannel, engine, state, nodes } = app(FakeHls);
     engine.createSmartProxyLoader = () => class {};
     const channel = { name: 'HLS Mirrors', url: 'https://cdn.test/a.m3u8', servers: [{ url: 'https://cdn.test/a.m3u8' }, { url: 'https://cdn.test/b.m3u8' }] };
     playChannel(channel);
@@ -130,6 +158,22 @@ test('fatal HLS failures advance mirrors and destroy the previous player', () =>
     assert.equal(state.currentServerIndex, 1);
     assert.equal(instances[0].destroyed, true);
     assert.equal(instances[1].config.backBufferLength, 15);
+    instances[1].events.error(null, { fatal: false, type: 'network', details: 'fragLoadTimeOut' });
+    assert.equal(instances.length, 2, 'recoverable segment warnings must leave HLS retries running');
+    instances[1].events.error(null, { fatal: true, type: 'network', response: { code: 525 } });
+    assert.equal(instances.length, 2, 'TLS failure must not retry the same source through another route');
+    assert.match(nodes.get('current-channel-status').textContent, /TLS.*525/);
+});
+
+test('each static mirror retains its own playback headers and uses the proxy when needed', () => {
+    const { playChannel, headers, nodes } = app();
+    const channel = { name: 'Headers', url: 'https://cdn.test/first.m3u8', headers: { referer: 'https://wrong.test/' }, servers: [
+        { url: 'https://cdn.test/first.m3u8', headers: { referer: 'https://first.test/' } },
+        { url: 'https://cdn.test/second.m3u8', headers: { referer: 'https://second.test/' } }
+    ] };
+    playChannel(channel, 1);
+    assert.equal(headers.at(-1).referer, 'https://second.test/');
+    assert.match(nodes.get('main-video').src, /^https:\/\/proxy.test/);
 });
 
 test('a local stream shows permission help and never falls back to a cloud proxy', () => {
@@ -141,7 +185,7 @@ test('a local stream shows permission help and never falls back to a cloud proxy
     assert.equal(nodes.get('main-video').src, url);
     assert.equal(nodes.get('local-network-help').hidden, false);
     nodes.get('main-video').onerror();
-    assert.equal(nodes.get('main-video').src, url);
+    assert.equal(nodes.get('main-video').src, undefined, 'a failed local connection is released');
     assert.equal(nodes.get('local-network-help').open, true);
     assert.match(nodes.get('current-channel-status').textContent, /browser permissions/);
     playChannel({ name: 'Public TV', url: 'https://cdn.test/live.m3u8' });
@@ -160,6 +204,11 @@ test('local IPv4, IPv6 and mDNS hosts stay direct even in forced proxy mode', ()
     }
     assert.equal(engine.isPrivateUrl('https://cdn10.example.com/192.168.1.20/live.m3u8'), false);
     assert.equal(engine.shouldRouteThroughProxy('https://cdn.test/live.m3u8', true), true);
+    const signed = 'https://cdn.test/live.m3u8?sig=a%2Fb%2Bc%3D&name=a+b';
+    assert.equal(engine.unwrapProxyUrl(engine.buildProxyUrl(signed)), signed);
+    assert.equal(engine.unwrapProxyUrl(signed), signed);
+    const unrelated = 'https://other.workers.dev/?url=' + encodeURIComponent(signed);
+    assert.equal(engine.unwrapProxyUrl(unrelated), unrelated);
 });
 
 test('web feed discovery falls back to its iframe on static sniff failure', async () => {
@@ -194,10 +243,15 @@ test('catalog refresh adds and removes mirrors without changing static servers o
     const result = reconcileWorkerCatalog(input, next);
     assert.equal(result.length, 2);
     assert.equal(result[0].servers.length, 2);
-    assert.equal(result[0].servers[0].url, staticChannel.url);
-    assert.equal(result[0].servers[1].url, 'catalog://fresh');
+    assert.equal(result[0].servers[1].url, staticChannel.url);
+    assert.equal(result[0].servers[0].url, 'catalog://fresh');
     assert.equal(staticChannel.servers[1].url, 'catalog://old');
     assert.equal(reconcileWorkerCatalog(result, next)[0].servers.length, 2);
+    const qualityAliases = reconcileWorkerCatalog([], [
+        { id: 'cricfy:33', name: 'T Sports FHD' }, { id: 'hdstreamz:1035', name: 'T Sports HD' }
+    ]);
+    assert.equal(qualityAliases.length, 1, 'HD and FHD names should share their mirror group');
+    assert.equal(qualityAliases[0].servers.length, 2);
 });
 
 test('automatic refresh retains the old guide on failure and keeps playback unchanged on success', async () => {

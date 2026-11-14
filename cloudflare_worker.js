@@ -22,33 +22,12 @@
 // Safely extract target stream URL while preserving tokens (?token=...&id=...)
 function extractTargetUrl(requestUrl) {
     const url = new URL(requestUrl);
-    let target = '';
-
-    // 1. Check ?url= parameter
-    if (url.searchParams.has('url')) {
-        const fullSearch = url.search;
-        const match = fullSearch.match(/[?&]url=([^&]+.*)/);
-        if (match && match[1]) {
-            target = match[1];
-        } else {
-            target = url.searchParams.get('url');
-        }
-    } else if (url.search.length > 1) {
-        // 2. Direct ?https://... format
-        target = url.search.slice(1);
+    if (url.searchParams.has('url')) return (url.searchParams.get('url') || '').trim();
+    let target = url.search.slice(1);
+    // Decode the wrapper once; never decode percent escapes inside a raw signed URL.
+    if (/^https?%3a/i.test(target)) {
+        try { target = decodeURIComponent(target); } catch (_) { return ''; }
     }
-
-    if (!target) return '';
-
-    // Safely decode only if URL-encoded
-    try {
-        if (target.startsWith('http%3A') || target.startsWith('https%3A') || target.includes('%2F') || target.includes('%3A')) {
-            target = decodeURIComponent(target);
-        }
-    } catch (e) {
-        // Keep as-is if malformed percent encoding
-    }
-
     return target.trim();
 }
 
@@ -97,6 +76,28 @@ function rewriteManifestUrls(manifestText, baseUrl, workerBaseUrl, ovQS = '') {
             return line;
         }
     }).join('\n');
+}
+
+// Bound playlist bodies: mislabeled live media must not pin a Worker indefinitely.
+async function readTextBounded(response, maxBytes = 2 * 1024 * 1024, timeoutMs = 8000) {
+    const reader = response.body?.getReader();
+    if (!reader) return '';
+    let timer;
+    const deadline = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Playlist response timed out')), timeoutMs); });
+    const decoder = new TextDecoder();
+    let bytes = 0, text = '';
+    try {
+        while (true) {
+            const { value, done } = await Promise.race([reader.read(), deadline]);
+            if (done) return text + decoder.decode();
+            bytes += value.byteLength;
+            if (bytes > maxBytes) throw new Error('Playlist exceeds the response size limit');
+            text += decoder.decode(value, { stream: true });
+        }
+    } finally {
+        clearTimeout(timer);
+        reader.cancel().catch(() => {});
+    }
 }
 
 // Core proxy request handler
@@ -164,7 +165,7 @@ async function handleProxyRequest(request) {
         // Referer & Origin: explicit ?ref=/?origin= wins (needed for embed-gated CDNs like
         // newkso.ru which require the embed-page referer, NOT the stream host); else auto.
         forwardHeaders.set('Referer', ov.ref || `${targetParsed.protocol}//${targetParsed.host}/`);
-        forwardHeaders.set('Origin', ov.origin || ov.ref?.replace(/\/$/, '') || `${targetParsed.protocol}//${targetParsed.host}`);
+        forwardHeaders.set('Origin', ov.origin || (ov.ref ? new URL(ov.ref).origin : targetParsed.origin));
         forwardHeaders.set('Accept', '*/*');
         forwardHeaders.set('Accept-Encoding', 'identity'); // Avoid compression mismatch on manifests
 
@@ -178,11 +179,15 @@ async function handleProxyRequest(request) {
         // (Cloudflare will act as the request origin, masking user local country and IP)
 
         // 4. Perform fetch to upstream media server
-        const upstreamResponse = await fetch(targetUrl, {
+        const headerController = new AbortController();
+        const headerTimer = setTimeout(() => headerController.abort(), 10000);
+        let upstreamResponse;
+        try { upstreamResponse = await fetch(targetUrl, {
             method: request.method === 'HEAD' ? 'HEAD' : 'GET',
             headers: forwardHeaders,
-            redirect: 'follow'
-        });
+            redirect: 'follow',
+            signal: request.signal ? AbortSignal.any([request.signal, headerController.signal]) : headerController.signal
+        }); } finally { clearTimeout(headerTimer); }
 
         // 5. Clone and modify response headers for browser delivery
         const responseHeaders = new Headers(upstreamResponse.headers);
@@ -199,13 +204,16 @@ async function handleProxyRequest(request) {
                            contentType.includes('application/x-mpegURL');
 
         // For manifests: disable cache, remove old content-length/encoding, and rewrite relative segment URLs
-        if (isManifest && upstreamResponse.status === 200) {
+        if (request.method === 'HEAD') return new Response(null, { status: upstreamResponse.status, headers: responseHeaders });
+
+        if (isManifest && [200, 206].includes(upstreamResponse.status)) {
             responseHeaders.set('Cache-Control', 'no-cache, no-store, must-revalidate');
             responseHeaders.set('Content-Type', 'application/vnd.apple.mpegurl; charset=utf-8');
             responseHeaders.delete('content-length');
             responseHeaders.delete('content-encoding');
 
-            const manifestText = await upstreamResponse.text();
+            const manifestText = await readTextBounded(upstreamResponse);
+            if (!manifestText.trimStart().startsWith('#EXTM3U')) throw new Error('Upstream returned non-HLS content instead of a playlist');
             const rewrittenManifest = rewriteManifestUrls(manifestText, upstreamResponse.url || targetUrl, workerBaseUrl, overridesToQS(ov));
 
             return new Response(rewrittenManifest, {
@@ -518,8 +526,16 @@ async function resolveChannel(ch, depth = 0, env) {
         const item = await sourceJson(response, env);
         if (!Array.isArray(item.streamUrls) || !item.streamUrls.length) throw new Error('ChannelItem has no streamUrls');
         const errors = [];
-        for (const stream of item.streamUrls) {
-            try { return await resolveChannel(apkStream(stream, response.url || ch.api), depth + 1, env); }
+        const variants = item.streamUrls.flatMap((stream, index) => {
+            try { apkStream(stream, response.url || ch.api); return [{ index, name: 'Source ' + (index + 1) }]; }
+            catch (_) { return []; }
+        });
+        for (const [index, stream] of item.streamUrls.entries()) {
+            if (ch.streamVariant != null && index !== ch.streamVariant) continue;
+            try {
+                const resolved = await resolveChannel(apkStream(stream, response.url || ch.api), depth + 1, env);
+                return { ...resolved, variant: index, variants };
+            }
             catch (e) { errors.push(e.message); }
         }
         throw new Error('ChannelItem resolvers failed: ' + errors.join('; '));
@@ -649,10 +665,11 @@ async function handleResolve(request, env) {
     let selected = ch;
     if (variant !== null) {
         const index = Number(variant);
-        if (!/^\d+$/.test(variant) || !Number.isSafeInteger(index) || ch.resolvers?.[index]?.type !== 'hdstreamz') {
+        const cricfyVariant = ch.id.startsWith('cricfy:') && ch.resolvers?.some(resolver => resolver.type === 'channel-item');
+        if (!/^\d+$/.test(variant) || !Number.isSafeInteger(index) || index > 255 || (!cricfyVariant && ch.resolvers?.[index]?.type !== 'hdstreamz')) {
             return new Response(JSON.stringify({ error: 'unknown source variant' }), { status: 400, headers: JSON_CORS });
         }
-        selected = ch.resolvers[index];
+        selected = cricfyVariant ? { ...ch, streamVariant: index } : ch.resolvers[index];
     }
     try {
         return new Response(JSON.stringify(await resolveChannel(selected, 0, env)), { headers: JSON_CORS });
