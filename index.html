@@ -12,7 +12,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
-    <link rel="stylesheet" href="css/app.css?v=7">
+    <link rel="stylesheet" href="css/app.css?v=8">
 </head>
 <body>
 
@@ -153,6 +153,7 @@
                     <p>This stream connects to a server on your local or ISP network. Join the Wi-Fi or ISP network that provides it. If your browser asks for local-network access, choose Allow to connect.</p>
                     <p>No prompt? Check this website's permissions in your browser settings and your browser's permissions in phone settings, if available. After changing a setting, tap Reload above to retry. Some browsers do not offer this permission.</p>
                     <p>Permission alone cannot fix an unreachable server, an HTTP stream blocked by an HTTPS page, or missing CORS support. You can also use the player's open-in-new-window button to open the stream directly. The website cannot accept browser permissions for you.</p>
+                    <a id="local-player-link" class="action-btn" target="_blank" rel="noopener noreferrer" hidden>Open local FTV player</a>
                 </details>
 
                 <!-- Now playing + stats drawer -->
@@ -444,8 +445,8 @@
 
     <!-- Scripts. hls.js is served from this site (pinned 1.7.4), so playback does not depend on a third-party CDN being reachable. -->
     <script src="js/vendor/hls.min.js?v=1.7.4"></script>
-    <script src="js/proxy-loader.js?v=12"></script>
+    <script src="js/proxy-loader.js?v=13"></script>
     <script src="js/health-checker.js?v=10"></script>
-    <script src="js/app.js?v=13"></script>
+    <script src="js/app.js?v=14"></script>
 </body>
 </html>

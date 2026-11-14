@@ -28,6 +28,9 @@ See [Cloudflare browser limits](https://developers.cloudflare.com/browser-run/li
 
 Publish the frontend changes through your existing GitHub Pages setup as well.
 Worker deployment alone does not update the website's JavaScript.
+The proxy now imports the scoped public HTTP origin helper in `tools/` and
+`cloudflare:sockets`; deploy with the prepared Wrangler command so it is bundled.
+Pasting only `cloudflare_worker.js` into the dashboard is insufficient.
 
 ## Verify
 
@@ -87,7 +90,7 @@ See [Cloudflare's GitHub Actions setup](https://developers.cloudflare.com/worker
 ## Local checks
 
 ```powershell
-node --test tests/resolver.test.cjs tests/playback.test.cjs tests/health-checker.test.cjs tools/browser-sniffer.test.mjs tools/cloudflare-sniffer.test.mjs tools/site-refresh.test.mjs
+node --test tests/*.test.cjs tools/browser-sniffer.test.mjs tools/cloudflare-sniffer.test.mjs tools/site-refresh.test.mjs
 npm.cmd run check:deploy --prefix tools
 ```
 

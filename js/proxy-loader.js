@@ -236,6 +236,31 @@ function resolveStream(id, signal, variant) { return resolverRequest('/resolve',
 function sniffStream(url, signal) { return resolverRequest('/sniff', { url }, signal); }
 function fetchFeed(signal) { return resolverRequest('/feed', {}, signal); }
 
+function localPlayerUrl(streamUrl) {
+    try {
+        const original = new URL(streamUrl);
+        if (original.protocol !== 'http:' || original.hostname !== '172.16.15.5' || original.port !== '8666') return null;
+        const streamId = original.pathname.split('/').filter(Boolean)[0];
+        return streamId ? 'http://172.16.15.5/play.php?stream=' + encodeURIComponent(streamId) : null;
+    } catch (_) { return null; }
+}
+
+async function refreshLocalStream(streamUrl, signal) {
+    const player = localPlayerUrl(streamUrl);
+    if (!player) return null;
+    const original = new URL(streamUrl);
+    const response = await fetch(player, {
+        cache: 'no-store', signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(4000)]) : AbortSignal.timeout(4000)
+    });
+    if (!response.ok) throw new Error('Local player page HTTP ' + response.status);
+    const html = await response.text();
+    const match = html.match(/(?:var|let|const)\s+videoSrc\s*=\s*['"]([^'"]+)['"]/);
+    if (!match) throw new Error('Local player page has no stream URL');
+    const refreshed = new URL(match[1].replace(/&amp;/g, '&'), original.origin);
+    if (refreshed.protocol !== 'http:' || refreshed.hostname !== original.hostname) throw new Error('Unexpected local stream host');
+    return refreshed.href;
+}
+
 // Fetch the Worker's /catalog route -> [{id,name,group,type}]
 async function fetchCatalog() {
     const base = PROXY_CONFIG.primary.replace(/\/?\?$/, '');
@@ -252,6 +277,8 @@ window.SmartProxyEngine = {
     resolveStream,
     sniffStream,
     fetchFeed,
+    refreshLocalStream,
+    localPlayerUrl,
     fetchCatalog,
     unwrapProxyUrl,
     buildProxyUrl,

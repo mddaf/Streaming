@@ -146,8 +146,24 @@ CRICFy detail responses expose supported stream variants to the player as well.
 Recoverable HLS warnings keep the library's retry behavior; definitive HTTP
 failures and fatal errors advance to another source. TLS 525/526 responses
 are reported as upstream TLS failures. The site cannot repair the provider's TLS.
-Public catalog mirrors are tried before LAN-only playlist mirrors. Each mirror
+Existing playlist/server order is preserved when catalog mirrors are appended. Each mirror
 retains its own playback headers. Signed query parameters are decoded once.
+The original FTV source remains first. Its expiring stream URL can be refreshed
+once from the local player page before trying another provider. If the server
+blocks cross-origin reads, Open local FTV player opens that page directly.
+These local requests still require access to the corresponding ISP network.
+The additional 49-channel [BDIX playlist](https://github.com/taukir007/TV-Playlists)
+targets `172.16.29.2` and is explicitly ISP-restricted; importing it does not make
+that private server publicly reachable.
+
+The observed public HTTP origin `103.16.24.4:8083` returned Cloudflare error 1003
+through ordinary Worker fetch. Its allowlisted HTTP transport uses Cloudflare's
+TCP sockets API and delivers playlists and media over the Worker's HTTPS URL.
+It supports byte ranges, fixed-length and chunked bodies, cancellation and header
+timeouts. It does not expose a general TCP proxy or connect to private origins.
+This removes the direct-IP fetch blocker; it does not guarantee a healthy feed.
+The player also advances sources if decoded video stops progressing for twenty
+seconds after playback begins, while respecting pauses and hidden tabs.
 
 The guide renders sources as they arrive, prioritizes Worker catalog channels,
 and pages results sixty cards at a time to keep the mobile DOM bounded. Search
@@ -171,7 +187,7 @@ segments, and HLS keys.
 Run Worker/player integration tests and the real-browser fixture tests with:
 
 ```sh
-node --test tests/resolver.test.cjs tests/playback.test.cjs tests/health-checker.test.cjs tools/browser-sniffer.test.mjs tools/cloudflare-sniffer.test.mjs tools/site-refresh.test.mjs
+node --test tests/*.test.cjs tools/browser-sniffer.test.mjs tools/cloudflare-sniffer.test.mjs tools/site-refresh.test.mjs
 ```
 
 The browser test loads a local iframe that builds its manifest URL dynamically

@@ -36,7 +36,7 @@ function app(HlsClass) {
     });
     const source = fs.readFileSync('js/app.js', 'utf8').replace(/\/\/ Run when DOM is ready[\s\S]*$/, 'applyFiltersAndRender = () => {}; window.testApp = { playChannel, state, reconcileWorkerCatalog, refreshWorkerCatalog }; })();');
     vm.runInContext(source, context);
-    return { ...window.testApp, nodes, pending, headers, engine, document, timers };
+    return { ...window.testApp, nodes, pending, headers, engine, document, timers, context };
 }
 const flush = () => new Promise(setImmediate);
 const catalog = id => ({ name: id, url: 'catalog://' + id, servers: [{ url: 'catalog://' + id, isCatalog: true, catalogId: id }] });
@@ -176,6 +176,57 @@ test('each static mirror retains its own playback headers and uses the proxy whe
     assert.match(nodes.get('main-video').src, /^https:\/\/proxy.test/);
 });
 
+test('an expired FTV token refreshes once before trying another provider', async () => {
+    const { playChannel, engine, nodes, state } = app();
+    let refreshes = 0;
+    engine.isPrivateUrl = url => url.startsWith('http://172.16.15.5');
+    engine.refreshLocalStream = async () => { refreshes++; return 'http://172.16.15.5:8666/tsports/fresh.m3u8'; };
+    const old = 'http://172.16.15.5:8666/tsports/expired.m3u8';
+    const channel = { name: 'T Sports', url: old, servers: [{ url: old }, { url: 'https://backup.test/live.m3u8' }] };
+    playChannel(channel);
+    nodes.get('main-video').onerror();
+    await flush();
+    assert.equal(nodes.get('main-video').src, 'http://172.16.15.5:8666/tsports/fresh.m3u8');
+    assert.equal(channel.servers[0].url, old, 'fresh tokens must not replace canonical playlist metadata');
+    nodes.get('main-video').onerror();
+    await flush();
+    assert.equal(refreshes, 1);
+    assert.equal(state.currentServerIndex, 1);
+});
+
+test('FTV player-page parsing stays on the same local origin and preserves fresh token escapes', async () => {
+    let request;
+    let html = "var videoSrc = 'http://172.16.15.5:8666/tsports/live.m3u8?sig=a%2Fb&amp;x=2';";
+    const context = vm.createContext({ window: {}, URL, AbortSignal, localStorage: { getItem() {} },
+        fetch: async url => { request = url; return new Response(html); }
+    });
+    vm.runInContext(fs.readFileSync('js/proxy-loader.js', 'utf8'), context);
+    const engine = context.window.SmartProxyEngine;
+    assert.equal(await engine.refreshLocalStream('http://172.16.15.5:8666/tsports/old.m3u8'), 'http://172.16.15.5:8666/tsports/live.m3u8?sig=a%2Fb&x=2');
+    assert.equal(request, 'http://172.16.15.5/play.php?stream=tsports');
+    html = "var videoSrc = 'http://different.test/live.m3u8';";
+    await assert.rejects(engine.refreshLocalStream('http://172.16.15.5:8666/tsports/old.m3u8'), /Unexpected local stream host/);
+});
+
+test('stalled decoded video advances sources even when the live clock keeps jumping', () => {
+    const { playChannel, state, nodes, context } = app();
+    context.fixtureNow = 1000;
+    vm.runInContext('Date.now = () => fixtureNow', context);
+    const channel = { name: 'Stall', url: 'https://cdn.test/one.m3u8', servers: [{ url: 'https://cdn.test/one.m3u8' }, { url: 'https://cdn.test/two.m3u8' }] };
+    state.routingMode = 'direct';
+    playChannel(channel);
+    const video = nodes.get('main-video');
+    video.paused = false;
+    video.getVideoPlaybackQuality = () => ({ totalVideoFrames: 7 });
+    video.onplaying();
+    state.monitorPlayback();
+    context.fixtureNow = 22001;
+    video.currentTime = 100;
+    video.onplaying();
+    state.monitorPlayback();
+    assert.equal(state.currentServerIndex, 1);
+});
+
 test('a local stream shows permission help and never falls back to a cloud proxy', () => {
     const { playChannel, engine, nodes } = app();
     engine.isPrivateUrl = url => url.startsWith('http://192.168.');
@@ -243,8 +294,8 @@ test('catalog refresh adds and removes mirrors without changing static servers o
     const result = reconcileWorkerCatalog(input, next);
     assert.equal(result.length, 2);
     assert.equal(result[0].servers.length, 2);
-    assert.equal(result[0].servers[1].url, staticChannel.url);
-    assert.equal(result[0].servers[0].url, 'catalog://fresh');
+    assert.equal(result[0].servers[0].url, staticChannel.url);
+    assert.equal(result[0].servers[1].url, 'catalog://fresh');
     assert.equal(staticChannel.servers[1].url, 'catalog://old');
     assert.equal(reconcileWorkerCatalog(result, next)[0].servers.length, 2);
     const qualityAliases = reconcileWorkerCatalog([], [

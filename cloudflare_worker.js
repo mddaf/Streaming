@@ -1,11 +1,10 @@
+import { connect } from 'cloudflare:sockets';
+import { fetchPublicHttpOrigin, supportsPublicHttpOrigin } from './tools/public-http-origin.mjs';
+
 /**
  * StreamPulse - Cloudflare Worker Smart Stream Proxy (Geo-Bypass & CORS Fix)
  * 
- * How to deploy:
- * 1. Go to https://dash.cloudflare.com/ -> Workers & Pages
- * 2. Select your worker (e.g. sports-proxy)
- * 3. Click "Edit Code"
- * 4. Replace everything with this code and click "Deploy"!
+ * Deploy with tools/wrangler.proxy.jsonc so the public HTTP helper is bundled.
  * 
  * Features:
  * - Full CORS enablement (Access-Control-Allow-Origin: * on ALL responses including 403/502)
@@ -182,7 +181,10 @@ async function handleProxyRequest(request) {
         const headerController = new AbortController();
         const headerTimer = setTimeout(() => headerController.abort(), 10000);
         let upstreamResponse;
-        try { upstreamResponse = await fetch(targetUrl, {
+        const originFetch = supportsPublicHttpOrigin(targetUrl)
+            ? (url, options) => fetchPublicHttpOrigin(url, options, connect)
+            : fetch;
+        try { upstreamResponse = await originFetch(targetUrl, {
             method: request.method === 'HEAD' ? 'HEAD' : 'GET',
             headers: forwardHeaders,
             redirect: 'follow',

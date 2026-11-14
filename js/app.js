@@ -17,6 +17,11 @@
             defaultCountry: 'bd'
         },
         {
+            name: 'Alternate BDIX TV (172.16.29.2; ISP access required)',
+            url: 'https://raw.githubusercontent.com/taukir007/TV-Playlists/main/TV.m3u8',
+            defaultCountry: 'bd'
+        },
+        {
             name: 'Verified Sports Live HD',
             url: './working_iptv_org_sports.m3u',
             defaultCategory: 'Sports'
@@ -565,8 +570,6 @@
             });
 
         const guide = Array.from(mergedMap.values());
-        // Try public catalog mirrors before LAN-only playlists on ordinary channel clicks.
-        guide.forEach(channel => channel.servers?.sort((a, b) => Number(!!b.isCatalog) - Number(!!a.isCatalog)));
         const catalogChannelsFirst = guide.filter(channel => channel.servers?.some(server => server.isCatalog));
         const otherChannels = guide.filter(channel => !channel.servers?.some(server => server.isCatalog));
         return [...catalogChannelsFirst, ...otherChannels];
@@ -1067,6 +1070,8 @@
         elements.video.pause();
         elements.video.removeAttribute('src');
         elements.video.onplaying = null;
+        elements.video.onwaiting = null;
+        state.monitorPlayback = null;
         if (state.resolveController) state.resolveController.abort();
         state.resolveController = null;
         elements.video.onerror = null;
@@ -1119,6 +1124,35 @@
         const isLocalStream = !!window.SmartProxyEngine?.isPrivateUrl?.(streamUrl);
         let usingProxy = forceProxy;
         let failed = false;
+        let localRefreshTried = !!playback?.localRefreshAttempted;
+        let localRefreshing = false;
+        function handlePlaybackFailure(reason, allowProxy = true) {
+            if (requestId !== state.playbackRequest || failed || localRefreshing) return;
+            // FTV's playlist contains expiring tokens. Restore its player-page refresh,
+            // once per source attempt, before falling back to unrelated catalog mirrors.
+            if (!localRefreshTried && /^http:\/\/172\.16\.15\.5:8666\//.test(streamUrl || '')
+                && window.SmartProxyEngine?.refreshLocalStream) {
+                localRefreshTried = true;
+                localRefreshing = true;
+                clearTimeout(state.startupTimer);
+                const controller = new AbortController();
+                state.resolveController = controller;
+                elements.currentChannelStatus.textContent = 'Refreshing local stream token...';
+                window.SmartProxyEngine.refreshLocalStream(streamUrl, controller.signal).then(url => {
+                    if (requestId !== state.playbackRequest || controller.signal.aborted) return;
+                    localRefreshing = false;
+                    if (url && url !== streamUrl) {
+                        playChannel(channel, serverIndex, false, proxyIndex, { url, localRefreshAttempted: true, headers: currentServer.headers || channel.headers });
+                    } else advanceServer(reason, allowProxy);
+                }).catch(() => {
+                    if (requestId !== state.playbackRequest || controller.signal.aborted) return;
+                    localRefreshing = false;
+                    advanceServer(reason, allowProxy);
+                });
+                return;
+            }
+            advanceServer(reason, allowProxy);
+        }
         function advanceServer(reason, allowProxy = true) {
             if (requestId !== state.playbackRequest || failed) return;
             failed = true;
@@ -1145,14 +1179,37 @@
         }
         const startupBudget = (channel.type === 'web' || channel.type === 'feed') ? 35000
             : String(streamUrl || '').startsWith('catalog://') ? 10000 : 20000;
-        state.startupTimer = setTimeout(() => advanceServer('Playback did not start in time.'), startupBudget);
+        state.startupTimer = setTimeout(() => handlePlaybackFailure('Playback did not start in time.'), startupBudget);
+        let hasPlayed = false;
+        let lastProgress = Date.now();
+        let lastFrame = null;
+        state.monitorPlayback = () => {
+            if (requestId !== state.playbackRequest || failed || !hasPlayed) return;
+            const video = elements.video;
+            if (video.paused || document.hidden) { lastProgress = Date.now(); return; }
+            const quality = video.getVideoPlaybackQuality?.();
+            const progress = quality?.totalVideoFrames > 0 ? quality.totalVideoFrames
+                : video.webkitDecodedFrameCount > 0 ? video.webkitDecodedFrameCount : video.currentTime;
+            if (progress !== lastFrame) { lastFrame = progress; lastProgress = Date.now(); }
+            else if (Date.now() - lastProgress > 20000) handlePlaybackFailure('The stream stopped delivering playable media.');
+        };
+        elements.video.onwaiting = () => {
+            if (requestId === state.playbackRequest && hasPlayed) elements.currentChannelStatus.textContent = 'Buffering...';
+        };
         elements.video.onplaying = () => {
             if (requestId !== state.playbackRequest) return;
+            if (!hasPlayed) { hasPlayed = true; lastProgress = Date.now(); }
             clearTimeout(state.startupTimer);
             elements.currentChannelStatus.textContent = 'Stream Live';
         };
         const localHelp = document.getElementById('local-network-help');
         if (localHelp) localHelp.hidden = !isLocalStream;
+        const localPlayerLink = document.getElementById('local-player-link');
+        const playerPage = window.SmartProxyEngine?.localPlayerUrl?.(streamUrl);
+        if (localPlayerLink) {
+            localPlayerLink.hidden = !playerPage;
+            localPlayerLink.href = playerPage || '';
+        }
 
         elements.currentStreamUrlBadge.textContent = streamUrl ? streamUrl.split('/')[2] || 'Stream Host' : '';
         elements.currentStreamUrlBadge.title = streamUrl || '';
@@ -1362,7 +1419,7 @@
                         ? `The upstream server's TLS connection failed (HTTP ${code}).`
                         : /timeout/i.test(data.details || '') ? 'The upstream playlist or media segment timed out.'
                         : `Stream request failed${code ? ' (HTTP ' + code + ')' : ''}.`;
-                    advanceServer(reason, ![404, 410, 525, 526].includes(code));
+                    handlePlaybackFailure(reason, ![404, 410, 525, 526].includes(code));
                 }
             });
         } 
@@ -1385,7 +1442,7 @@
                 });
             };
 
-            elements.video.onerror = () => advanceServer('Stream request failed.');
+            elements.video.onerror = () => handlePlaybackFailure('Stream request failed.');
         }
 
         startDiagnosticsTimer();
@@ -1704,6 +1761,7 @@
     function startDiagnosticsTimer() {
         if (state.diagTimer) clearInterval(state.diagTimer);
         state.diagTimer = setInterval(() => {
+            state.monitorPlayback?.();
             if (!state.diagnosticsOpen || !state.hlsInstance) return;
 
             const video = elements.video;
@@ -1942,7 +2000,7 @@
 
         elements.popoutBtn.addEventListener('click', () => {
             if (state.currentChannel) {
-                const targetUrl = state.activePlaybackUrl;
+                const targetUrl = window.SmartProxyEngine?.localPlayerUrl?.(state.activePlaybackUrl) || state.activePlaybackUrl;
                 if (targetUrl) window.open(targetUrl, '_blank', 'width=1280,height=720,toolbar=0,menubar=0');
             }
         });

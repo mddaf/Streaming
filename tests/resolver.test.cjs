@@ -3,10 +3,12 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const nodeCrypto = require('node:crypto');
+const { fetchPublicHttpOrigin, supportsPublicHttpOrigin } = require('../tools/public-http-origin.mjs');
 
 function worker(routes = {}) {
     const calls = [];
     const context = vm.createContext({ URL, URLSearchParams, Headers, Request, Response, AbortSignal, AbortController, atob, TextDecoder, setTimeout, clearTimeout, crypto: nodeCrypto.webcrypto,
+        fetchPublicHttpOrigin, supportsPublicHttpOrigin,
         fetch: async (url, options) => {
             calls.push({ url, options });
             const result = routes[url];
@@ -14,7 +16,7 @@ function worker(routes = {}) {
             return new Response(typeof result === 'string' ? result : JSON.stringify(result.body), { status: result.status || 200 });
         }
     });
-    vm.runInContext(fs.readFileSync('cloudflare_worker.js', 'utf8').replace('export default {', 'const worker = {'), context);
+    vm.runInContext(fs.readFileSync('cloudflare_worker.js', 'utf8').replace(/^import .*;\r?\n/gm, '').replace('export default {', 'const worker = {'), context);
     return { context, calls };
 }
 
