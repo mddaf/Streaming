@@ -19,7 +19,8 @@ const origin = 'http://103.16.24.4:8083/live.m3u8?sig=a%2Fb';
 
 test('public HTTP transport is limited to the observed public origin and port', async () => {
     assert.equal(supportsPublicHttpOrigin(origin), true);
-    for (const url of ['http://172.16.15.5:8083/', 'http://127.0.0.1:8083/', 'https://103.16.24.4:8083/', 'http://103.16.24.4:80/']) {
+    assert.equal(supportsPublicHttpOrigin('http://103.114.11.37:8081/T-Sports-FHD/index.m3u8?token=sboxcast'), true);
+    for (const url of ['http://172.16.15.5:8083/', 'http://127.0.0.1:8083/', 'https://103.16.24.4:8083/', 'http://103.16.24.4:80/', 'http://103.114.11.37:8083/', 'http://user:password@103.114.11.37:8081/']) {
         assert.equal(supportsPublicHttpOrigin(url), false);
         await assert.rejects(fetchPublicHttpOrigin(url, {}, () => { throw new Error('must not connect'); }), /not configured/);
     }

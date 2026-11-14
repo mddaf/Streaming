@@ -1,7 +1,8 @@
-// This is an observed public catalogue origin, not a general TCP proxy.
+// Observed public catalogue origins only; this is not a general TCP proxy.
+const PUBLIC_HTTP_ORIGINS = new Set(['103.16.24.4:8083', '103.114.11.37:8081']);
 export function supportsPublicHttpOrigin(url) {
     const target = new URL(url);
-    return target.protocol === 'http:' && target.hostname === '103.16.24.4' && target.port === '8083';
+    return target.protocol === 'http:' && !target.username && !target.password && PUBLIC_HTTP_ORIGINS.has(target.host);
 }
 
 export async function fetchPublicHttpOrigin(url, options, connect) {

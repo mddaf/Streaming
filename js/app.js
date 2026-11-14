@@ -26,6 +26,11 @@
             defaultCountry: 'bd'
         },
         {
+            name: 'T Sports & BTV alternatives',
+            url: './tsports_btv_verified.m3u',
+            defaultCountry: 'bd'
+        },
+        {
             name: 'Verified Sports Live HD',
             url: './working_iptv_org_sports.m3u',
             defaultCategory: 'Sports'

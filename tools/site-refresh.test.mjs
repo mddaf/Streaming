@@ -88,6 +88,11 @@ test('real website refreshes its guide while its resolved embed keeps playing', 
         assert.equal(await originalFtv.isChecked(), false, 'local server choice survives reload');
         assert.equal(await alternateFtv.isChecked(), true);
         assert.deepEqual(errors, []);
+        await page.locator('#sources-modal .modal-close-btn').click();
+        await page.locator('#search-input').fill('BTV Chattogram');
+        await page.waitForFunction(() => document.querySelectorAll('.channel-card').length === 1 && document.querySelector('.channel-card').textContent.includes('BTV Chattogram'));
+        assert.equal(await page.locator('.channel-card').count(), 1);
+        assert.equal(await page.locator('.channel-card .card-srv-btn').count(), 2, 'the two BTV Chattogram URLs must merge as server alternatives');
 
         const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
         const mobileErrors = [];

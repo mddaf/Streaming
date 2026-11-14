@@ -18,6 +18,8 @@ bounded selection of sources. Catalogue availability (57 CRICFy groups and
 | HD Streamz Astro Cricket, source 0 | Resolver correctly reported unsupported DRM playback. |
 | Original local FTV T Sports | Homepage and player-page endpoints returned 200 and still publish the channel. The freshly extracted stream URL returned 404 in the later check. Browser cross-origin access to the player page was also blocked. The local-player button opens the native page without requiring a cross-origin read. |
 | Alternate local BDIX playlist | Publisher playlist downloaded successfully with 49 channel records targeting `172.16.29.2`. Its T Sports endpoint timed out from this network. It is added as an ISP-restricted alternative, not verified global playback. |
+| Internet-discovered T Sports HD (`103.114.11.37:8081`) | Chrome decoded video and the T Sports HD station identity was checked. Added to the default supplemental playlist. The HTTPS relay returned the manifest and a 206 media range; some requests also returned intermittent 403/404 responses. Sustained playback is not guaranteed. |
+| Internet-discovered BTV National and BTV Chattogram | Chrome decoded the expected channels from one National URL and two Chattogram URLs. All three are in the default supplemental playlist; the Chattogram pair merges into a two-server channel. |
 
 These results can change with provider availability, geography, CDN routing and
 expiring URLs. Successful ranged media checks do not establish sustained browser

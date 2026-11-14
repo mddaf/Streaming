@@ -159,14 +159,22 @@ Both local playlists have independent checkboxes in Playlist sources. The origin
 FTV source starts enabled; the alternate starts disabled. Choices are saved in
 the browser and update the guide automatically. Either or both can be selected.
 
-The observed public HTTP origin `103.16.24.4:8083` returned Cloudflare error 1003
-through ordinary Worker fetch. Its allowlisted HTTP transport uses Cloudflare's
+The observed public HTTP origins `103.16.24.4:8083` and `103.114.11.37:8081` use
+the allowlisted transport. Direct-IP requests returned Cloudflare error 1003
+through ordinary Worker fetch. The HTTP transport uses Cloudflare's
 TCP sockets API and delivers playlists and media over the Worker's HTTPS URL.
 It supports byte ranges, fixed-length and chunked bodies, cancellation and header
 timeouts. It does not expose a general TCP proxy or connect to private origins.
 This removes the direct-IP fetch blocker; it does not guarantee a healthy feed.
 The player also advances sources if decoded video stops progressing for twenty
 seconds after playback begins, while respecting pauses and hidden tabs.
+
+The default source `tsports_btv_verified.m3u` adds the four internet-discovered
+URLs checked on November 14, 2026: T Sports HD, BTV National and two BTV
+Chattogram alternatives. They merge into existing channel/server groups; the
+Chattogram pair renders as two servers for one channel. Initial decoded video
+and station identity were verified. These are provider URLs, so future
+availability is not guaranteed. The HTTP T Sports origin is relayed over HTTPS.
 
 The guide renders sources as they arrive, prioritizes Worker catalog channels,
 and pages results sixty cards at a time to keep the mobile DOM bounded. Search
