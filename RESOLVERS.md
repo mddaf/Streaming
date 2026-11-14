@@ -155,6 +155,9 @@ These local requests still require access to the corresponding ISP network.
 The additional 49-channel [BDIX playlist](https://github.com/taukir007/TV-Playlists)
 targets `172.16.29.2` and is explicitly ISP-restricted; importing it does not make
 that private server publicly reachable.
+Both local playlists have independent checkboxes in Playlist sources. The original
+FTV source starts enabled; the alternate starts disabled. Choices are saved in
+the browser and update the guide automatically. Either or both can be selected.
 
 The observed public HTTP origin `103.16.24.4:8083` returned Cloudflare error 1003
 through ordinary Worker fetch. Its allowlisted HTTP transport uses Cloudflare's

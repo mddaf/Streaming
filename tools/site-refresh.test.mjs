@@ -70,6 +70,25 @@ test('real website refreshes its guide while its resolved embed keeps playing', 
         assert.match(await localHelp.innerText(), /website cannot accept browser permissions/);
         assert.deepEqual(errors, []);
 
+        await page.locator('#open-sources-btn').click();
+        const originalFtv = page.getByRole('checkbox', { name: 'FTV Local BDIX (172.16.15.5)', exact: true });
+        const alternateFtv = page.getByRole('checkbox', { name: 'Alternate FTV (172.16.29.2)', exact: true });
+        assert.equal(await originalFtv.isChecked(), true);
+        assert.equal(await alternateFtv.isChecked(), false);
+        await Promise.all([
+            page.waitForRequest(request => request.url().includes('taukir007/TV-Playlists')),
+            alternateFtv.check()
+        ]);
+        await Promise.all([
+            page.waitForRequest(request => new URL(request.url()).pathname === '/catalog'),
+            originalFtv.uncheck()
+        ]);
+        await page.reload();
+        await page.locator('#open-sources-btn').click();
+        assert.equal(await originalFtv.isChecked(), false, 'local server choice survives reload');
+        assert.equal(await alternateFtv.isChecked(), true);
+        assert.deepEqual(errors, []);
+
         const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
         const mobileErrors = [];
         mobile.on('pageerror', error => mobileErrors.push(error.message));

@@ -14,11 +14,15 @@
         {
             name: 'FTV Local BDIX (172.16.15.5)',
             url: './ftv_channels.m3u',
+            localOption: true,
+            enabledByDefault: true,
             defaultCountry: 'bd'
         },
         {
-            name: 'Alternate BDIX TV (172.16.29.2; ISP access required)',
+            name: 'Alternate FTV (172.16.29.2)',
             url: 'https://raw.githubusercontent.com/taukir007/TV-Playlists/main/TV.m3u8',
+            localOption: true,
+            enabledByDefault: false,
             defaultCountry: 'bd'
         },
         {
@@ -113,6 +117,8 @@
         selectedCategory: 'all',
         selectedCountry: 'all',
         customSources: [],
+        enabledLocalSources: new Set(DEFAULT_PLAYLIST_SOURCES.filter(source => source.localOption && source.enabledByDefault).map(source => source.url)),
+        sourceLoadGeneration: 0,
         searchQuery: '',
         hideOffline: false, // Show all channels with live/dead status badges by default
         viewMode: 'grid', // 'grid' | 'list'
@@ -219,6 +225,11 @@
             if (savedView) state.viewMode = savedView;
             const customSrcs = localStorage.getItem('streampulse_custom_sources');
             if (customSrcs) state.customSources = JSON.parse(customSrcs);
+            const localSources = localStorage.getItem('streampulse_local_sources');
+            if (localSources) {
+                const selected = JSON.parse(localSources);
+                if (Array.isArray(selected)) state.enabledLocalSources = new Set(selected.filter(url => DEFAULT_PLAYLIST_SOURCES.some(source => source.localOption && source.url === url)));
+            }
         } catch (e) {
             console.warn('Storage read error:', e);
         }
@@ -395,6 +406,7 @@
     }
 
     async function loadAndMergeAllSources() {
+        const generation = ++state.sourceLoadGeneration;
         elements.channelsContainer.innerHTML = `
             <div class="loading-box">
                 <div class="spinner"></div>
@@ -406,7 +418,7 @@
         state.isLoading = true;
 
         // Combine default preset sources and custom sources
-        const sourcesToFetch = [...DEFAULT_PLAYLIST_SOURCES, ...state.customSources];
+        const sourcesToFetch = [...DEFAULT_PLAYLIST_SOURCES.filter(source => !source.localOption || state.enabledLocalSources.has(source.url)), ...state.customSources];
 
         try {
             // Cancel any old health probes
@@ -418,6 +430,7 @@
             let currentCatalog = [];
             let publishTimer;
             const publish = () => {
+                if (generation !== state.sourceLoadGeneration) return;
                 state.masterChannels = mergeLoadedSources(loaded, currentCatalog);
                 applyFiltersAndRender();
             };
@@ -459,12 +472,14 @@
                 catalogPromise
             ]);
             clearTimeout(publishTimer);
+            if (generation !== state.sourceLoadGeneration) return;
             state.masterChannels = mergeLoadedSources(results, catalogChannels);
             state.lastCatalogRefresh = Date.now();
             state.isLoading = false;
 
             applyFiltersAndRender();
         } catch (err) {
+            if (generation !== state.sourceLoadGeneration) return;
             state.isLoading = false;
             elements.channelsContainer.innerHTML = `
                 <div class="empty-box">
@@ -1609,6 +1624,7 @@
     /* --------------------------------------------------------------------------
        Sources Modal Checklist
        -------------------------------------------------------------------------- */
+    let localSourceReloadTimer;
     function renderSourcesModalList() {
         if (!elements.sourcesListContainer) return;
         elements.sourcesListContainer.innerHTML = '';
@@ -1633,6 +1649,24 @@
                 </div>
                 <span class="badge-pill" style="background:rgba(16,185,129,0.15);color:var(--accent-emerald);">Merged Active</span>
             `;
+            if (src.localOption) {
+                const toggle = document.createElement('input');
+                toggle.type = 'checkbox';
+                toggle.checked = state.enabledLocalSources.has(src.url);
+                toggle.setAttribute('aria-label', src.name);
+                toggle.style.marginRight = '10px';
+                const badge = row.querySelector('.badge-pill');
+                badge.textContent = toggle.checked ? 'Enabled' : 'Disabled';
+                toggle.onchange = () => {
+                    if (toggle.checked) state.enabledLocalSources.add(src.url);
+                    else state.enabledLocalSources.delete(src.url);
+                    try { localStorage.setItem('streampulse_local_sources', JSON.stringify([...state.enabledLocalSources])); } catch (_) {}
+                    badge.textContent = toggle.checked ? 'Enabled' : 'Disabled';
+                    clearTimeout(localSourceReloadTimer);
+                    localSourceReloadTimer = setTimeout(loadAndMergeAllSources, 150);
+                };
+                row.prepend(toggle);
+            }
             elements.sourcesListContainer.appendChild(row);
         });
     }
